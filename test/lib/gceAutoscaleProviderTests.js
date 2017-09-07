@@ -64,11 +64,11 @@ module.exports = {
             var vmId = 'vm1';
             var privateIp = '1.2.3.4';
             var publicIp = '5.6.7.8';
-            var zone = '1234';
+            var region = '1234';
 
             var passedOptions;
 
-            provider.zone = zone;
+            provider.region = region;
 
             provider.compute.getVMs = function(options) {
                 passedOptions = options;
@@ -77,7 +77,7 @@ module.exports = {
                         {
                             id: vmId,
                             zone: {
-                                id: zone + '-a'
+                                id: region + '-a'
                             },
                             metadata: {
                                 networkInterfaces: [
