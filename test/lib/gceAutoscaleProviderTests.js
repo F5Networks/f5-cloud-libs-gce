@@ -1,5 +1,5 @@
 /**
- * Copyright 2016-2017 F5 Networks, Inc.
+ * Copyright 2016-2018 F5 Networks, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,71 +13,70 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 'use strict';
 
-var q;
-var GceAutoscaleProvider;
-var provider;
+let GceAutoscaleProvider;
+let provider;
 
 // Our tests cause too many event listeners. Turn off the check.
 process.setMaxListeners(0);
 
 module.exports = {
-    setUp: function(callback) {
-        q = require('q');
-
+    setUp(callback) {
+        // eslint-disable-next-line global-require
         GceAutoscaleProvider = require('../../lib/gceAutoscaleProvider');
         provider = new GceAutoscaleProvider();
 
         callback();
     },
 
-    tearDown: function(callback) {
-        Object.keys(require.cache).forEach(function(key) {
+    tearDown(callback) {
+        Object.keys(require.cache).forEach((key) => {
             delete require.cache[key];
         });
         callback();
     },
 
     testGetNicsByTag: {
-        testBasic: function(test) {
+        testBasic(test) {
             test.expect(1);
             provider.getNicsByTag('foo')
-                .then(function(response) {
+                .then((response) => {
                     test.strictEqual(response.length, 0);
                 })
-                .catch(function(err) {
+                .catch((err) => {
                     test.ok(false, err.message);
                 })
-                .finally(function() {
+                .finally(() => {
                     test.done();
                 });
         }
     },
 
     testGetVmsByTag: {
-        testBasic: function(test) {
-            var myTag = {
+        testBasic(test) {
+            const myTag = {
                 key: 'foo',
                 value: 'bar'
             };
-            var vmId = 'vm1';
-            var privateIp = '1.2.3.4';
-            var publicIp = '5.6.7.8';
-            var region = '1234';
+            const vmId = 'vm1';
+            const privateIp = '1.2.3.4';
+            const publicIp = '5.6.7.8';
+            const region = '1234';
 
-            var passedOptions;
+            let passedOptions;
 
             provider.region = region;
 
-            provider.compute.getVMs = function(options) {
+            provider.compute.getVMs = function getVMs(options) {
                 passedOptions = options;
-                return new Promise(function(resolve) {
+                return new Promise((resolve) => {
                     resolve([[
                         {
                             id: vmId,
                             zone: {
-                                id: region + '-a'
+                                id: `${region}-a`
                             },
                             metadata: {
                                 networkInterfaces: [
@@ -98,8 +97,8 @@ module.exports = {
 
             test.expect(2);
             provider.getVmsByTag(myTag)
-                .then(function(response) {
-                    test.deepEqual(passedOptions, { filter: 'labels.' + myTag.key + ' eq ' + myTag.value });
+                .then((response) => {
+                    test.deepEqual(passedOptions, { filter: `labels.${myTag.key} eq ${myTag.value}` });
                     test.deepEqual(
                         response[0],
                         {
@@ -111,78 +110,76 @@ module.exports = {
                         }
                     );
                 })
-                .catch(function(err) {
+                .catch((err) => {
                     test.ok(false, err.message);
                 })
-                .finally(function() {
+                .finally(() => {
                     test.done();
                 });
         },
 
-        testNoResults: function(test) {
-            var myTag = {
+        testNoResults(test) {
+            const myTag = {
                 key: 'foo',
                 value: 'bar'
             };
-            var passedOptions;
 
-            provider.compute.getVMs = function(options) {
-                passedOptions = options;
-                return new Promise(function(resolve) {
+            provider.compute.getVMs = function getVms() {
+                return new Promise((resolve) => {
                     resolve([[]]);
                 });
             };
 
             test.expect();
             provider.getVmsByTag(myTag)
-                .then(function(response) {
+                .then((response) => {
                     test.strictEqual(response.length, 0);
                 })
-                .catch(function(err) {
+                .catch((err) => {
                     test.ok(false, err.message);
                 })
-                .finally(function() {
+                .finally(() => {
                     test.done();
                 });
         },
 
-        testBadTag: function(test) {
-            var myTag = 'foo';
+        testBadTag(test) {
+            const myTag = 'foo';
 
             test.expect(1);
             provider.getVmsByTag(myTag)
-                .then(function() {
+                .then(() => {
                     test.ok(false, 'getVmsByTag should have thrown');
                 })
-                .catch(function(err) {
+                .catch((err) => {
                     test.notStrictEqual(err.message.indexOf('key and value'), -1);
                 })
-                .finally(function() {
+                .finally(() => {
                     test.done();
                 });
         },
 
-        testError: function(test) {
-            var myTag = {
+        testError(test) {
+            const myTag = {
                 key: 'foo',
                 value: 'bar'
             };
 
-            provider.compute.getVMs = function() {
-                return new Promise(function(resolve, reject) {
+            provider.compute.getVMs = function getVms() {
+                return new Promise((resolve, reject) => {
                     reject(new Error('uh oh'));
                 });
             };
 
             test.expect(1);
             provider.getVmsByTag(myTag)
-                .then(function() {
+                .then(() => {
                     test.ok(false, 'getVmsByTag should have thrown');
                 })
-                .catch(function(err) {
+                .catch((err) => {
                     test.strictEqual(err.message, 'uh oh');
                 })
-                .finally(function() {
+                .finally(() => {
                     test.done();
                 });
         }

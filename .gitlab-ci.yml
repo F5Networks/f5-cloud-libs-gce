@@ -3,13 +3,31 @@ image: node:4
 stages:
     - test
     - package
+    - publish
+    - notify
 
-test:
+test_node4:
+    image: node:4
     tags:
         - docker-executor
     stage: test
+    except:
+        - triggers
     script:
-        - npm install
+        - npm install --registry ${NPM_REGISTRY}
+        - npm run lint
+        - npm test
+
+test_node6:
+    image: node:6
+    tags:
+        - docker-executor
+    stage: test
+    except:
+        - triggers
+    script:
+        - npm install --registry ${NPM_REGISTRY}
+        - npm run lint
         - npm test
 
 package:
@@ -19,11 +37,35 @@ package:
     only:
         - /^release-.*/
         - /^hf-.*/
-        - triggers
     script:
         - npm run package -- --no-deps
     artifacts:
-        name: f5-cloud-libs-gce-$CI_BUILD_REF
+        name: ${CI_PROJECT_NAME}-${CI_BUILD_REF}
         paths:
             - dist/
             - doc/
+
+publish:
+    tags:
+        - docker-executor
+    stage: publish
+    only:
+        - master
+    script:
+        - npm install npm@latest -g --registry ${NPM_REGISTRY}
+        - echo '//registry.npmjs.org/:_authToken="${NPM_TOKEN}"' > ./.npmrc
+        - npm publish --access public --tag experimental
+
+notify:
+    tags:
+        - docker-executor
+    stage: notify
+    except:
+        - master
+    script:
+        - if [[ "$AUTO_NOTIFY" == true ]]; then
+        -     echo 'Running notifyProjects.sh'
+        -     ./build/notifyProjects.sh
+        - else
+        -     echo AUTO_NOTIFY is off, skipping notification.
+        - fi

@@ -4,4 +4,9 @@ if [[ $1 == '--no-deps' ]]; then
     npm install --production
 fi
 
-tar -C .. --exclude=".git*" --exclude="test" --exclude="${PWD##*/}/dist" --exclude="doc" -zcvf dist/f5-cloud-libs-gce.tar.gz f5-cloud-libs-gce
+tar -C .. --exclude=".git*" --exclude="test" --exclude="${PWD##*/}/dist" --exclude="build" --exclude="doc" --exclude="gitHooks" -cf dist/f5-cloud-libs-gce.tar f5-cloud-libs-gce
+
+# Suppress gzips timetamp in the tarball - otherwise the digest hash changes on each
+# commit even if the contents do not change. This causes an infinite loop in the build scripts
+# due to packages triggering each other to uptdate hashes.
+gzip -nf dist/f5-cloud-libs-gce.tar
