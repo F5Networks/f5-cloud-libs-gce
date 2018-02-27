@@ -17,11 +17,12 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
+    "@f5devcentral/f5-cloud-libs": "^4.0.0-alpha.5",
     "@google-cloud/compute": "^0.8.0",
     "q": "^1.5.0"
   },
   "peerDependencies": {
-    "@f5devcentral/f5-cloud-libs": "^3.6.2"
+    "@f5devcentral/f5-cloud-libs": "^4.0.0-alpha.5"
   },
   "devDependencies": {
     "eslint": "^4.16.0",
