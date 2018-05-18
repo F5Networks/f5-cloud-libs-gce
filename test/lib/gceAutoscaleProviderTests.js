@@ -16,17 +16,36 @@
 
 'use strict';
 
+const q = require('q');
+
+const region = 'aRegion';
+const secretId = 'aSecret';
+const clientId = 'aClient';
+const projectId = 'aProject';
+const credentials = {
+    foo: 'bar'
+};
+
 let GceAutoscaleProvider;
 let provider;
+
+let localCryptoUtilMock;
+let cloudUtilMock;
 
 // Our tests cause too many event listeners. Turn off the check.
 process.setMaxListeners(0);
 
 module.exports = {
     setUp(callback) {
-        // eslint-disable-next-line global-require
+
+        /* eslint-disable global-require */
+        localCryptoUtilMock = require('@f5devcentral/f5-cloud-libs').localCryptoUtil;
+        cloudUtilMock = require('@f5devcentral/f5-cloud-libs').util;
         GceAutoscaleProvider = require('../../lib/gceAutoscaleProvider');
+        /* eslint-enable global-require */
+
         provider = new GceAutoscaleProvider();
+        provider.compute = {};
 
         callback();
     },
@@ -36,6 +55,89 @@ module.exports = {
             delete require.cache[key];
         });
         callback();
+    },
+
+    testInit: {
+        testCredentials(test) {
+            localCryptoUtilMock.decryptDataFromRestStorage = function decryptDataFromRestStorage() {
+                return q(
+                    {
+                        credentialsJson: credentials
+                    }
+                );
+            };
+
+            const providerOptions = {
+                secretId,
+                clientId,
+                projectId,
+                region: 'east'
+            };
+            provider.init(providerOptions)
+                .then(() => {
+                    test.deepEqual(provider.compute.authClient.config.credentials, credentials);
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testCredentialsNoRegion(test) {
+            localCryptoUtilMock.decryptDataFromRestStorage = function decryptDataFromRestStorage() {
+                return q(
+                    {
+                        credentialsJson: credentials
+                    }
+                );
+            };
+
+            const providerOptions = { secretId, clientId, projectId };
+            provider.init(providerOptions)
+                .then(() => {
+                    test.ok(false, 'Should have thrown no region');
+                })
+                .catch((err) => {
+                    test.notStrictEqual(err.message.indexOf('region is required'), -1);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testNoCredentials(test) {
+            const providerOptions = { region };
+            provider.init(providerOptions)
+                .then(() => {
+                    test.strictEqual(provider.region, region);
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testNoCredentialsNoRegion(test) {
+            cloudUtilMock.getDataFromUrl = function getDataFromUrl() {
+                return q('projects/734288666861/zones/us-west1-a');
+            };
+
+            const providerOptions = {};
+            provider.init(providerOptions)
+                .then(() => {
+                    test.strictEqual(provider.region, 'us-west1');
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        }
     },
 
     testGetNicsByTag: {
@@ -63,7 +165,6 @@ module.exports = {
             const vmId = 'vm1';
             const privateIp = '1.2.3.4';
             const publicIp = '5.6.7.8';
-            const region = '1234';
 
             let passedOptions;
 
