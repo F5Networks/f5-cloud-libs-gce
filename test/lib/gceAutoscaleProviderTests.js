@@ -37,7 +37,6 @@ process.setMaxListeners(0);
 
 module.exports = {
     setUp(callback) {
-
         /* eslint-disable global-require */
         localCryptoUtilMock = require('@f5devcentral/f5-cloud-libs').localCryptoUtil;
         cloudUtilMock = require('@f5devcentral/f5-cloud-libs').util;
