@@ -1,5 +1,5 @@
 {
-  "name": "@f5devcentral/f5-cloud-libs-google",
+  "name": "@f5devcentral/f5-cloud-libs-gce",
   "version": "2.1.0",
   "description": "Google Cloud implementation of f5-cloud-libs cloud provider code",
   "keywords": [
@@ -18,19 +18,20 @@
   "license": "Apache-2.0",
   "dependencies": {
     "@google-cloud/compute": "^0.10.0",
-    "q": "^1.5.0"
+    "@google-cloud/storage": "^1.7.0",
+    "q": "^1.5.1"
   },
   "peerDependencies": {
     "@f5devcentral/f5-cloud-libs": "^4.2.0-beta.1"
   },
   "devDependencies": {
-    "eslint": "^4.16.0",
+    "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
-    "eslint-plugin-import": "^2.8.0",
-    "nodeunit": "^0.11.1"
+    "eslint-plugin-import": "^2.9.0",
+    "nodeunit": "^0.11.2"
   },
   "scripts": {
-    "lint": "node node_modules/eslint/bin/eslint lib",
+    "lint": "node node_modules/eslint/bin/eslint lib src",
     "package": "bash ./package.sh",
     "test": "node node_modules/nodeunit/bin/nodeunit --reporter eclipse test test/lib",
     "version": "./setVersion.sh $npm_package_version && git add ."

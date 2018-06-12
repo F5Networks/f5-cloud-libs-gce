@@ -26,11 +26,43 @@ const credentials = {
     foo: 'bar'
 };
 
+const instanceId = 'this_is_my_instance_id';
+
+const vm1 = {
+    name: 'vm1',
+    metadata: {
+        status: 'RUNNING',
+    },
+    getMetadata() {
+        return q(
+            [{
+                networkInterfaces: [
+                    {
+                        networkIP: '1.2.3.4',
+                        accessConfigs: [
+                            {
+                                natIP: '5.6.7.8'
+                            }
+                        ]
+                    }
+                ]
+            }]
+        );
+    }
+};
+
+const instance1 = {
+    id: 'vm1',
+    isMaster: false
+};
+
+let AutoscaleProvider;
 let GceAutoscaleProvider;
 let provider;
 
 let localCryptoUtilMock;
 let cloudUtilMock;
+let computeMock;
 
 // Our tests cause too many event listeners. Turn off the check.
 process.setMaxListeners(0);
@@ -40,11 +72,26 @@ module.exports = {
         /* eslint-disable global-require */
         localCryptoUtilMock = require('@f5devcentral/f5-cloud-libs').localCryptoUtil;
         cloudUtilMock = require('@f5devcentral/f5-cloud-libs').util;
+        computeMock = require('@google-cloud/compute');
+
+        AutoscaleProvider = require('@f5devcentral/f5-cloud-libs').autoscaleProvider;
         GceAutoscaleProvider = require('../../lib/gceAutoscaleProvider');
         /* eslint-enable global-require */
 
         provider = new GceAutoscaleProvider();
         provider.compute = {};
+
+        cloudUtilMock.getDataFromUrl = function getDataFromUrl(url) {
+            if (url.endsWith('instance/zone')) {
+                return q(`projects/734288666861/zones/${region}-a`);
+            } else if (url.endsWith('instance/name')) {
+                return q(instanceId);
+            } else if (url.endsWith('project/project-id')) {
+                return q(projectId);
+            }
+
+            return q();
+        };
 
         callback();
     },
@@ -121,14 +168,10 @@ module.exports = {
         },
 
         testNoCredentialsNoRegion(test) {
-            cloudUtilMock.getDataFromUrl = function getDataFromUrl() {
-                return q('projects/734288666861/zones/us-west1-a');
-            };
-
             const providerOptions = {};
             provider.init(providerOptions)
                 .then(() => {
-                    test.strictEqual(provider.region, 'us-west1');
+                    test.strictEqual(provider.region, region);
                 })
                 .catch((err) => {
                     test.ok(false, err);
@@ -137,6 +180,296 @@ module.exports = {
                     test.done();
                 });
         }
+    },
+
+    testElectMaster: {
+        testBasic(test) {
+            const instances = {
+                1: {
+                    privateIp: '1.2.3.4',
+                    versionOk: true,
+                    providerVisible: true
+                },
+                2: {
+                    privateIp: '2.3.4.5',
+                    versionOk: true,
+                    providerVisible: true
+                }
+            };
+
+            test.expect(1);
+            provider.electMaster(instances)
+                .then((response) => {
+                    test.strictEqual(response, '1');
+                })
+                .catch((err) => {
+                    test.ok(false, err.message);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testProviderNotVisible(test) {
+            const instances = {
+                1: {
+                    privateIp: '1.2.3.4',
+                    versionOk: true,
+                    providerVisible: false
+                },
+                2: {
+                    privateIp: '2.3.4.5',
+                    versionOk: true,
+                    providerVisible: true
+                }
+            };
+
+            test.expect(1);
+            provider.electMaster(instances)
+                .then((response) => {
+                    test.strictEqual(response, '2');
+                })
+                .catch((err) => {
+                    test.ok(false, err.message);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testVersionNotOk(test) {
+            const instances = {
+                1: {
+                    privateIp: '1.2.3.4',
+                    versionOk: false,
+                    providerVisible: true
+                },
+                2: {
+                    privateIp: '2.3.4.5',
+                    versionOk: true,
+                    providerVisible: true
+                }
+            };
+
+            test.expect(1);
+            provider.electMaster(instances)
+                .then((response) => {
+                    test.strictEqual(response, '2');
+                })
+                .catch((err) => {
+                    test.ok(false, err.message);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testExternal(test) {
+            const instances = {
+                1: {
+                    privateIp: '1.2.3.4',
+                    versionOk: true,
+                    providerVisible: true
+                },
+                2: {
+                    privateIp: '2.3.4.5',
+                    versionOk: true,
+                    providerVisible: true,
+                    external: true
+                }
+            };
+
+            test.expect(1);
+            provider.electMaster(instances)
+                .then((response) => {
+                    test.strictEqual(response, '2');
+                })
+                .catch((err) => {
+                    test.ok(false, err.message);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        }
+    },
+
+    testGetInstanceId(test) {
+        test.expect(1);
+        provider.getInstanceId()
+            .then((response) => {
+                test.strictEqual(response, instanceId);
+            })
+            .catch((err) => {
+                test.ok(false, err.message);
+            })
+            .finally(() => {
+                test.done();
+            });
+    },
+
+    testGetInstances: {
+        setUp(cb) {
+            computeMock.zone = function zone() {
+                return {
+                    instanceGroup() {
+                        return {
+                            getVMs() {
+                                return [
+                                    [
+                                        vm1
+                                    ]
+                                ];
+                            }
+                        };
+                    }
+                };
+            };
+
+            provider.providerOptions = {
+                instanceGroup: 'foo'
+            };
+
+            provider.storageBucket = {
+                getFiles() {
+                    return q([
+                        [
+                            {
+                                download() {
+                                    return [
+                                        JSON.stringify(instance1)
+                                    ];
+                                },
+                                getMetadata() {
+                                    return [
+                                        {
+                                            name: 'instances/vm1'
+                                        }
+                                    ];
+                                }
+                            }
+                        ]
+                    ]);
+                }
+            };
+
+            provider.compute = computeMock;
+            cb();
+        },
+
+        testBasic(test) {
+            test.expect(3);
+            provider.getInstances()
+                .then((response) => {
+                    test.strictEqual(Object.keys(response).length, 1);
+                    test.deepEqual(response.vm1.id, instance1.id);
+                    test.deepEqual(response.vm1.isMaster, instance1.isMaster);
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testExternalInstances(test) {
+            computeMock.zone = function zone() {
+                return {
+                    instanceGroup() {
+                        return {
+                            getVMs() {
+                                return [
+                                    [
+                                        vm1
+                                    ]
+                                ];
+                            }
+                        };
+                    }
+                };
+            };
+
+            provider.getVmsByTag = function getVmsByTag() {
+                return q([
+                    {
+                        id: 'vm2',
+                        ip: {
+                            public: '10.11.12.13',
+                            private: '15.16.17.18'
+                        }
+                    }
+                ]);
+            };
+
+            test.expect(2);
+            provider.getInstances({ externalTag: 'foo' })
+                .then((response) => {
+                    test.strictEqual(Object.keys(response).length, 2);
+                    test.deepEqual(response.vm2.external, true);
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testMissingInstances(test) {
+            provider.storageBucket = {
+                getFiles() {
+                    return q([[]]);
+                }
+            };
+
+            test.expect(2);
+            provider.getInstances()
+                .then((response) => {
+                    test.strictEqual(Object.keys(response).length, 1);
+                    test.deepEqual(response.vm1.privateIp, '1.2.3.4');
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        }
+    },
+
+    testGetMessages(test) {
+        const message1 = 'i am message 1';
+        const message2 = 'i am message 2';
+
+        provider.pubSub = {
+            pull() {
+                return q(
+                    [
+                        {
+                            toInstanceId: '1',
+                            message: message1
+                        },
+                        {
+                            toInstanceId: '2',
+                            message: message2
+                        }
+                    ]
+                );
+            }
+        };
+
+        test.expect(2);
+        provider.getMessages([AutoscaleProvider.MESSAGE_SYNC_COMPLETE], { toInstanceId: '1' })
+            .then((response) => {
+                test.strictEqual(response.length, 1);
+                test.strictEqual(response[0].message, message1);
+            })
+            .catch((err) => {
+                test.ok(false, err);
+            })
+            .finally(() => {
+                test.done();
+            });
     },
 
     testGetNicsByTag: {
@@ -175,6 +508,7 @@ module.exports = {
                     resolve([[
                         {
                             id: vmId,
+                            name: vmId,
                             zone: {
                                 id: `${region}-a`
                             },
@@ -189,6 +523,9 @@ module.exports = {
                                         ]
                                     }
                                 ]
+                            },
+                            getMetadata() {
+                                return q([this.metadata]);
                             }
                         }
                     ]]);
@@ -283,5 +620,87 @@ module.exports = {
                     test.done();
                 });
         }
+    },
+
+    testMasterElected(test) {
+        let instanceIdSent;
+        let instanceSent;
+
+        provider.providerOptions = {
+            instanceGroup: 'foo'
+        };
+
+        provider.storageBucket = {
+            getFiles() {
+                return q([
+                    [
+                        {
+                            download() {
+                                return [
+                                    JSON.stringify({
+                                        isMaster: true
+                                    })
+                                ];
+                            },
+                            getMetadata() {
+                                return [
+                                    {
+                                        name: 'instances/vm1'
+                                    }
+                                ];
+                            }
+                        },
+                        {
+                            download() {
+                                return [
+                                    JSON.stringify({
+                                        isMaster: true
+                                    })
+                                ];
+                            },
+                            getMetadata() {
+                                return [
+                                    {
+                                        name: 'instances/vm2'
+                                    }
+                                ];
+                            }
+                        }
+                    ]
+                ]);
+            }
+        };
+
+        provider.pubSub = {
+            getSubscriptions() {
+                return q([[]]);
+            },
+            createSubscription() {
+                return q();
+            },
+            getTopics() {
+                return q([[]]);
+            },
+            createTopic() {
+                return q();
+            }
+        };
+
+        provider.putInstance = function putInstance(dbInstanceId, instance) {
+            instanceIdSent = dbInstanceId;
+            instanceSent = instance;
+        };
+
+        provider.masterElected('vm1')
+            .then(() => {
+                test.strictEqual(instanceIdSent, 'vm2');
+                test.strictEqual(instanceSent.isMaster, false);
+            })
+            .catch((err) => {
+                test.ok(false, err);
+            })
+            .finally(() => {
+                test.done();
+            });
     }
 };
