@@ -80,7 +80,8 @@ Promise.all([
 
         /** zone info is in the format 'projects/734288666861/zones/us-west1-a' */
         const parts = mdataZone.split('/');
-        Zone = compute.zone(parts[parts.length - 1]);
+        zone = parts[parts.length - 1];
+        Zone = compute.zone(zone);
 
         logger.silly('Getting VMs');
         return getVmsByTag(deploymentTag);
@@ -298,6 +299,31 @@ function getVmsByTag(tag) {
 }
 
 /**
+* Retry function using tryUntil
+*
+* @param {Object} fnToTry - Function to try
+*
+* @param {Object} arr - Array of arguments
+*
+* @returns {Promise} A promise which will be resolved with the metadata for the instance.
+*
+*/
+function retrier(fnToTry, arr) {
+    return new Promise(
+        function retryFunc(resolve, reject) {
+            util.tryUntil(this, { maxRetries: 4, retryIntervalMs: 15000 }, fnToTry, arr)
+                .then(() => {
+                    resolve();
+                })
+                .catch((error) => {
+                    logger.error('Error: ', error);
+                    reject(error);
+                });
+        }
+    );
+}
+
+/**
 * Determine what NICs to update, update any necessary
 *
 * @param {Object} vms - List of instances with properties
@@ -316,21 +342,6 @@ function updateNics(vms) {
     const aliasIpsArr = [];
     const disassociateArr = [];
     const associateArr = [];
-
-    const retrier = function (fnToTry, nicArr) {
-        return new Promise(
-            function retryFunc(resolve, reject) {
-                util.tryUntil(this, { maxRetries: 4, retryIntervalMs: 15000 }, fnToTry, nicArr)
-                    .then(() => {
-                        resolve();
-                    })
-                    .catch((error) => {
-                        logger.error('Error: ', error);
-                        reject(error);
-                    });
-            }
-        );
-    };
 
     /** Look through each VM and seperate us vs. them */
     vms.forEach((vm) => {
