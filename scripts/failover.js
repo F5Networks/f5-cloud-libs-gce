@@ -15,7 +15,7 @@ const Logger = f5CloudLibs.logger;
 const compute = new Compute();
 
 /**
- * Grab command line arguments
+ * Parse command line arguments
 */
 parser
     .version('1.0.0')
@@ -75,14 +75,13 @@ Promise.all([
         logger.error(err.message);
     });
 
-
 /**
  * Queries local metadata service for an entry
  *
  * @param {String} entry - The name of the metadata entry. For example 'instance/zone'
  *
- * @returns {Promise} A promise which is resolved with the data or rejected if an
- *                    error occurs.
+ * @returns {Promise} A promise which is resolved with the metadata requested.
+ *
  */
 function getLocalMetadata(entry) {
     const options = {
@@ -99,13 +98,13 @@ function getLocalMetadata(entry) {
             return data;
         })
         .catch((err) => {
-            const message = `Error getting metadata ${err.message}`;
+            const message = `Error getting local metadata ${err.message}`;
             return q.reject(message);
         });
 }
 
 /**
-* Get VM Metadata
+* Gets VM Metadata from API
 *
 * @param {Object} vmName - VM Name
 *
@@ -156,7 +155,7 @@ function init() {
 }
 
 /**
-* Send arbitrary HTTP Request
+* Send HTTP Request to GCP API
 *
 * @returns {Promise} A promise which will be resolved upon complete response.
 *
@@ -216,6 +215,7 @@ function updateNic(vmId, nicId, nicArr) {
         nicArr
     )
         .then((data) => {
+            /** updateNetworkInterface is async, returns GCP operation */
             const operation = Zone.operation(data.name);
             return operation.promise();
         })
@@ -235,7 +235,7 @@ function updateNic(vmId, nicId, nicArr) {
 * @param {Object} tag - Tag to search for. Tag is of the format:
 *
 *                 {
-*                     key: optional key
+*                     key: key to search for
 *                     value: value to search for
 *                 }
 *
@@ -277,12 +277,11 @@ function getVmsByTag(tag) {
 }
 
 /**
-* Determine what NICs to update
+* Determine what NICs to update, update any necessary
 *
 * @param {Object} vms - List of instances with properties
 *
-* @returns {Promise} A promise which will be resolved with an array of instances.
-*                    Each instance value should be:
+* @returns {Promise} A promise which will be resolved once update NICs is complete.
 *
 */
 function updateNics(vms) {
