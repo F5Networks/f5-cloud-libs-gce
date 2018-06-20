@@ -27,16 +27,20 @@ parser
 
 const loggerOptions = { logLevel: parser.logLevel, fileName: parser.logFile, console: true };
 const logger = Logger.getLogger(loggerOptions);
+const BigIp = f5CloudLibs.bigIp;
+const bigip = new BigIp({ logger });
 
 /** Initialize vars */
-let deploymentTag;
 const BASE_URL = 'https://www.googleapis.com/compute/beta';
+let deploymentTag;
 let Zone;
 let zone;
 let initialized;
 let accessToken;
 let projectId;
 let instanceName;
+let globalSettings;
+let tgStats;
 
 /** Read in configuration values */
 if (fs.existsSync(parser.configFile)) {
@@ -47,19 +51,36 @@ if (fs.existsSync(parser.configFile)) {
     };
 }
 
+/** Perform Failover */
 Promise.all([
     init(),
-    getLocalMetadata('instance/zone'),
-    getLocalMetadata('instance/name')
+    bigip.init(
+        'localhost',
+        'admin',
+        'admin',
+        {
+            port: '443',
+        }
+    )
 ])
+    .then(() => {
+        logger.silly('Initialize complete, getting info');
+        return Promise.all([
+            getLocalMetadata('instance/zone'),
+            getLocalMetadata('instance/name'),
+            bigip.list('/tm/sys/global-settings'),
+            bigip.list('/tm/cm/traffic-group/stats')
+        ]);
+    })
     .then((data) => {
-        const mdataZone = data[1];
-        instanceName = data[2];
+        const mdataZone = data[0];
+        instanceName = data[1];
+        globalSettings = data[2];
+        tgStats = data[3];
 
         /** zone info is in the format 'projects/734288666861/zones/us-west1-a' */
         const parts = mdataZone.split('/');
-        zone = parts[parts.length - 1];
-        Zone = compute.zone(zone);
+        Zone = compute.zone(parts[parts.length - 1]);
 
         logger.silly('Getting VMs');
         return getVmsByTag(deploymentTag);
@@ -287,11 +308,14 @@ function getVmsByTag(tag) {
 function updateNics(vms) {
     const deferred = q.defer();
 
+    const entries = tgStats.entries;
+    const hostname = globalSettings.hostname;
     const myVms = [];
     const theirVms = [];
+    const myTrafficGroupsArr = [];
+    const aliasIpsArr = [];
     const disassociateArr = [];
     const associateArr = [];
-    const aliasIpsArr = [];
 
     const retrier = function (fnToTry, nicArr) {
         return new Promise(
@@ -308,7 +332,7 @@ function updateNics(vms) {
         );
     };
 
-    /** Should only be one myVm */
+    /** Look through each VM and seperate us vs. them */
     vms.forEach((vm) => {
         if (vm.name === instanceName) {
             myVms.push(vm);
@@ -317,10 +341,35 @@ function updateNics(vms) {
         }
     });
 
+    /** Should be one item in myVms */
+    if (!myVms.length) {
+        const message = `Could not find our VM in the deployment: ${instanceName}`;
+        logger.error(message);
+        return q.reject(new Error(message));
+    }
+
+    /** Look through traffic group and select any we are active for */
+    Object.keys(entries).forEach((key) => {
+        if (entries[key].nestedStats.entries.deviceName.description.includes(hostname)
+        && entries[key].nestedStats.entries.failoverState.description === 'active') {
+            myTrafficGroupsArr.push({
+                trafficGroup: entries[key].nestedStats.entries.trafficGroup.description
+            });
+        }
+    });
+
+    /** Should be at least one item in myTrafficGroupsArr */
+    if (!myTrafficGroupsArr.length) {
+        const message = `We are not active for any traffic groups: ${instanceName}`;
+        logger.info(message);
+        return q();
+    }
+
     theirVms.forEach((vm) => {
         logger.silly(`VM name: ${vm.name}`);
         vm.networkInterfaces.forEach((nic) => {
-            const aliasIps = nic.aliasIpRanges;
+            const theirNic = nic;
+            const aliasIps = theirNic.aliasIpRanges;
             if (aliasIps) {
                 logger.silly(`aliasIps found: ${aliasIps}`);
                 /** Track all alias IPs found for inclusion on active BIG-IP */
@@ -330,8 +379,7 @@ function updateNics(vms) {
                     aliasIpRanges: aliasIps
                 });
 
-                /** Yank alias IPs from their VM NIC properties, target for removal */
-                const theirNic = nic;
+                /** Yank alias IPs from their VM NIC properties, mark NIC for update */
                 theirNic.aliasIpRanges = [];
                 disassociateArr.push([vm.name, nic.name, theirNic]);
             }
