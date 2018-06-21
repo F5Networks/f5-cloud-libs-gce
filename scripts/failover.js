@@ -66,7 +66,7 @@ Promise.all([
     )
 ])
     .then(() => {
-        logger.silly('Initialize complete, getting info');
+        logger.info('Performing failover');
         return Promise.all([
             getLocalMetadata('instance/zone'),
             getLocalMetadata('instance/name'),
@@ -82,7 +82,7 @@ Promise.all([
         tgStats = data[3];
         virtualAddresses = data[4];
 
-        /** zone info is in the format 'projects/734288666861/zones/us-west1-a' */
+        /** zone format: 'projects/734288666861/zones/us-west1-a' */
         const parts = mdataZone.split('/');
         zone = parts[parts.length - 1];
         Zone = compute.zone(zone);
@@ -98,11 +98,11 @@ Promise.all([
         logger.info('Failover Complete');
     })
     .catch((err) => {
-        logger.error(err.message);
+        logger.error(`Failover Failed: ${err.message}`);
     });
 
 /**
- * Queries local metadata service for an entry
+ * Get local metadata for a specific entry
  *
  * @param {String} entry - The name of the metadata entry. For example 'instance/zone'
  *
@@ -130,16 +130,15 @@ function getLocalMetadata(entry) {
 }
 
 /**
-* Gets VM Metadata from API
+* Get instance metadata from GCP
 *
-* @param {Object} vmName - VM Name
+* @param {Object} vmName - Instance Name
 *
 * @returns {Promise} A promise which will be resolved with the metadata for the instance.
 *
 */
 function getVmMetadata(vmName) {
     const deferred = q.defer();
-
     const vm = Zone.vm(vmName);
 
     vm.getMetadata()
@@ -164,20 +163,22 @@ function init() {
     if (initialized) {
         return q();
     }
+    const deferred = q.defer();
 
-    return getLocalMetadata.call(this, 'project/project-id')
-        .then((resp) => {
-            projectId = resp;
-            return getLocalMetadata.call(this, 'instance/service-accounts/default/token');
-        })
-        .then((token) => {
-            accessToken = token.access_token;
+    Promise.all([
+        getLocalMetadata('project/project-id'),
+        getLocalMetadata('instance/service-accounts/default/token')
+    ])
+        .then((data) => {
+            projectId = data[0];
+            accessToken = data[1].access_token;
             initialized = true;
-            return q();
+            deferred.resolve();
         })
         .catch((err) => {
-            return q.reject(new Error(`Error in initialize: ${err}`));
+            deferred.reject(`Error in initialize: ${err}`);
         });
+    return deferred.promise;
 }
 
 /**
@@ -200,9 +201,9 @@ function sendRequest(method, path, body) {
 }
 
 /**
-* Get Instance Information
+* Get Instance Information from VM metadata
 *
-* @param {Object} vmName - VM Name
+* @param {Object} vmName - Instance Name
 *
 * @returns {Promise} A promise which will be resolved with the metadata for the instance.
 *
@@ -224,9 +225,11 @@ function getVmInfo(vmName) {
 /**
 * Updates Instance Network Interface
 *
-* @param {Object} vmId - Instance resource ID
+* @param {Object} vmId - Instance ID
 *
-* @param {Object} nicArr - NIC object
+* @param {Object} nicId - NIC ID (name)
+*
+* @param {Object} nicArr - Updated NIC properties
 *
 * @returns {Promise} A promise which will be resolved with the operation response.
 *
@@ -256,9 +259,9 @@ function updateNic(vmId, nicId, nicArr) {
 }
 
 /**
-* Searches for VMs that have a given tag.
+* Get all VMs with a given tag (label).
 *
-* @param {Object} tag - Tag to search for. Tag is of the format:
+* @param {Object} tag - Tag to search for. Tag should be in the format:
 *
 *                 {
 *                     key: key to search for
@@ -396,7 +399,7 @@ function updateNics(vms) {
 
     /** There should be one item in myVms */
     if (!myVms.length) {
-        const message = `Could not find our VM in the deployment: ${instanceName}`;
+        const message = `Unable to locate our VM in the deployment: ${instanceName}`;
         logger.error(message);
         return q.reject(new Error(message));
     }
@@ -418,22 +421,24 @@ function updateNics(vms) {
         return q();
     }
 
+    /** There should be at least one item in virtualAddresses */
     if (!virtualAddresses.length) {
-        logger.error('No virtual addresses exist, create them prior to failover.');
-    } else {
-        virtualAddresses.forEach((virtualAddress) => {
-            const address = virtualAddress.address;
-            const vaTg = virtualAddress.trafficGroup;
-
-            myTrafficGroupsArr.forEach((tg) => {
-                if (tg.trafficGroup.includes(vaTg)) {
-                    trafficGroupIpArr.push({
-                        address
-                    });
-                }
-            });
-        });
+        logger.info('No virtual addresses exist, create them prior to failover.');
+        return q();
     }
+
+    virtualAddresses.forEach((virtualAddress) => {
+        const address = virtualAddress.address;
+        const vaTg = virtualAddress.trafficGroup;
+
+        myTrafficGroupsArr.forEach((tg) => {
+            if (tg.trafficGroup.includes(vaTg)) {
+                trafficGroupIpArr.push({
+                    address
+                });
+            }
+        });
+    });
 
     theirVms.forEach((vm) => {
         logger.silly(`VM name: ${vm.name}`);
@@ -490,6 +495,7 @@ function updateNics(vms) {
         });
     });
 
+    /** helpful debug */
     logger.silly(`disassociateArr: ${JSON.stringify(disassociateArr, null, 1)}`);
     logger.silly(`associateArr: ${JSON.stringify(associateArr, null, 1)}`);
 
