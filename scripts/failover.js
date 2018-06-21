@@ -5,6 +5,7 @@
 const parser = require('commander');
 const fs = require('fs');
 const q = require('q');
+const ipaddr = require('ipaddr.js');
 
 const Compute = require('@google-cloud/compute');
 const f5CloudLibs = require('@f5devcentral/f5-cloud-libs');
@@ -41,6 +42,7 @@ let projectId;
 let instanceName;
 let globalSettings;
 let tgStats;
+let virtualAddresses;
 
 /** Read in configuration values */
 if (fs.existsSync(parser.configFile)) {
@@ -69,7 +71,8 @@ Promise.all([
             getLocalMetadata('instance/zone'),
             getLocalMetadata('instance/name'),
             bigip.list('/tm/sys/global-settings'),
-            bigip.list('/tm/cm/traffic-group/stats')
+            bigip.list('/tm/cm/traffic-group/stats'),
+            bigip.list('/tm/ltm/virtual-address')
         ]);
     })
     .then((data) => {
@@ -77,6 +80,7 @@ Promise.all([
         instanceName = data[1];
         globalSettings = data[2];
         tgStats = data[3];
+        virtualAddresses = data[4];
 
         /** zone info is in the format 'projects/734288666861/zones/us-west1-a' */
         const parts = mdataZone.split('/');
@@ -324,6 +328,43 @@ function retrier(fnToTry, arr) {
 }
 
 /**
+* Match IPs against a filter set of IPs
+*
+* @param {Object} ips - Array of IPs, support in .ipCidrRange
+*
+* @param {Object} ipsFilter - Array of IPs to filter IPs against, support in .address
+*
+* @returns {Promise} A promise which will be resolved with the array of matched IPs.
+*
+*/
+function matchIps(ips, ipsFilter) {
+    const matched = [];
+
+    ips.forEach((ip) => {
+        /** Each IP should contain CIDR suffix */
+        let ipAddr = ip.ipCidrRange !== undefined ? ip.ipCidrRange : ip;
+        ipAddr = ipAddr.indexOf('/') === -1 ? `${ipAddr}/32` : ipAddr;
+        const ipAddrParsed = ipaddr.parseCIDR(ipAddr);
+        let match = false;
+
+        ipsFilter.forEach((ipFilter) => {
+            /** IP in filter array within range will constitute match */
+            let ipFilterAddr = ipFilter.address !== undefined ? ipFilter.address : ipFilter;
+            ipFilterAddr = ipFilterAddr.split('/')[0];
+            const ipFilterAddrParsed = ipaddr.parse(ipFilterAddr);
+            if (ipFilterAddrParsed.match(ipAddrParsed)) {
+                match = true;
+            }
+        });
+        /** Add IP to matched array if a match was found */
+        if (match) {
+            matched.push(ip);
+        }
+    });
+    return matched;
+}
+
+/**
 * Determine what NICs to update, update any necessary
 *
 * @param {Object} vms - List of instances with properties
@@ -340,6 +381,7 @@ function updateNics(vms) {
     const theirVms = [];
     const myTrafficGroupsArr = [];
     const aliasIpsArr = [];
+    const trafficGroupIpArr = [];
     const disassociateArr = [];
     const associateArr = [];
 
@@ -352,7 +394,7 @@ function updateNics(vms) {
         }
     });
 
-    /** Should be one item in myVms */
+    /** There should be one item in myVms */
     if (!myVms.length) {
         const message = `Could not find our VM in the deployment: ${instanceName}`;
         logger.error(message);
@@ -369,30 +411,60 @@ function updateNics(vms) {
         }
     });
 
-    /** Should be at least one item in myTrafficGroupsArr */
+    /** There should be at least one item in myTrafficGroupsArr */
     if (!myTrafficGroupsArr.length) {
         const message = `We are not active for any traffic groups: ${instanceName}`;
         logger.info(message);
         return q();
     }
 
+    if (!virtualAddresses.length) {
+        logger.error('No virtual addresses exist, create them prior to failover.');
+    } else {
+        virtualAddresses.forEach((virtualAddress) => {
+            const address = virtualAddress.address;
+            const vaTg = virtualAddress.trafficGroup;
+
+            myTrafficGroupsArr.forEach((tg) => {
+                if (tg.trafficGroup.includes(vaTg)) {
+                    trafficGroupIpArr.push({
+                        address
+                    });
+                }
+            });
+        });
+    }
+
     theirVms.forEach((vm) => {
         logger.silly(`VM name: ${vm.name}`);
         vm.networkInterfaces.forEach((nic) => {
             const theirNic = nic;
-            const aliasIps = theirNic.aliasIpRanges;
-            if (aliasIps) {
-                logger.silly(`aliasIps found: ${aliasIps}`);
-                /** Track all alias IPs found for inclusion on active BIG-IP */
-                aliasIpsArr.push({
-                    vmName: vm.name,
-                    nicName: nic.name,
-                    aliasIpRanges: aliasIps
-                });
+            const theirAliasIps = theirNic.aliasIpRanges;
+            if (theirAliasIps && theirAliasIps.length) {
+                const matchingAliasIps = matchIps(theirAliasIps, trafficGroupIpArr);
 
-                /** Yank alias IPs from their VM NIC properties, mark NIC for update */
-                theirNic.aliasIpRanges = [];
-                disassociateArr.push([vm.name, nic.name, theirNic]);
+                if (matchingAliasIps.length) {
+                    /** Track all alias IPs found for inclusion */
+                    aliasIpsArr.push({
+                        vmName: vm.name,
+                        nicName: nic.name,
+                        aliasIpRanges: matchingAliasIps
+                    });
+
+                    /** Yank alias IPs from their VM NIC properties, mark NIC for update */
+                    matchingAliasIps.forEach((myIp) => {
+                        let i = 0;
+                        theirAliasIps.forEach((theirIp) => {
+                            if (myIp.ipCidrRange === theirIp.ipCidrRange) {
+                                theirAliasIps.splice(i, 1);
+                            }
+                            i += 1;
+                        });
+                    });
+
+                    theirNic.aliasIpRanges = theirAliasIps;
+                    disassociateArr.push([vm.name, nic.name, theirNic]);
+                }
             }
         });
     });
