@@ -32,7 +32,7 @@ const BigIp = f5CloudLibs.bigIp;
 const bigip = new BigIp({ logger });
 
 /** Initialize vars */
-const BASE_URL = 'https://www.googleapis.com/compute/beta';
+const BASE_URL = 'https://www.googleapis.com/compute/v1';
 let deploymentTag;
 let Zone;
 let zone;
