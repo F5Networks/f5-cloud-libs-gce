@@ -19,7 +19,6 @@
 const q = require('q');
 
 const region = 'aRegion';
-const secretId = 'aSecret';
 const clientId = 'aClient';
 const projectId = 'aProject';
 const credentials = {
@@ -60,7 +59,6 @@ let AutoscaleProvider;
 let GceAutoscaleProvider;
 let provider;
 
-let localCryptoUtilMock;
 let cloudUtilMock;
 let computeMock;
 
@@ -70,7 +68,6 @@ process.setMaxListeners(0);
 module.exports = {
     setUp(callback) {
         /* eslint-disable global-require */
-        localCryptoUtilMock = require('@f5devcentral/f5-cloud-libs').localCryptoUtil;
         cloudUtilMock = require('@f5devcentral/f5-cloud-libs').util;
         computeMock = require('@google-cloud/compute');
 
@@ -105,18 +102,11 @@ module.exports = {
 
     testInit: {
         testCredentials(test) {
-            localCryptoUtilMock.decryptDataFromRestStorage = function decryptDataFromRestStorage() {
-                return q(
-                    {
-                        credentialsJson: credentials
-                    }
-                );
-            };
-
+            const secretBase64 = Buffer.from(JSON.stringify(credentials)).toString('base64');
             const providerOptions = {
-                secretId,
                 clientId,
                 projectId,
+                secret: secretBase64,
                 region: 'east'
             };
             provider.init(providerOptions)
@@ -132,15 +122,12 @@ module.exports = {
         },
 
         testCredentialsNoRegion(test) {
-            localCryptoUtilMock.decryptDataFromRestStorage = function decryptDataFromRestStorage() {
-                return q(
-                    {
-                        credentialsJson: credentials
-                    }
-                );
+            const secretBase64 = Buffer.from(JSON.stringify(credentials)).toString('base64');
+            const providerOptions = {
+                clientId,
+                projectId,
+                secret: secretBase64
             };
-
-            const providerOptions = { secretId, clientId, projectId };
             provider.init(providerOptions)
                 .then(() => {
                     test.ok(false, 'Should have thrown no region');
