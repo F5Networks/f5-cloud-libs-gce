@@ -62,6 +62,8 @@ let provider;
 let cloudUtilMock;
 let computeMock;
 
+const vmSetTagsParams = {};
+
 // Our tests cause too many event listeners. Turn off the check.
 process.setMaxListeners(0);
 
@@ -607,6 +609,88 @@ module.exports = {
                     test.done();
                 });
         }
+    },
+    testTagMaster: {
+        setUp(callback) {
+            const instances = {
+                'bigip-bf4b': {
+                    tags: [
+                        'other-tag'
+                    ]
+                },
+                'bigip-jjzs': {
+                    tags: [
+                        'other-tag', 'foo-master'
+                    ]
+                },
+                'bigip-uuio': {
+                    tags: [
+                        'other-tag'
+                    ]
+                }
+            };
+
+            computeMock.zone = function zone() {
+                return {
+                    vm(name) {
+                        return {
+                            name,
+                            getTags() {
+                                return [
+                                    instances[name].tags,
+                                    'fingerprint',
+                                    { name }
+                                ];
+                            },
+                            setTags(tags, fingerprint) {
+                                vmSetTagsParams[name] = {
+                                    tags,
+                                    fingerprint
+                                };
+                                return q();
+                            }
+                        };
+                    }
+                };
+            };
+
+            provider.compute = computeMock;
+            callback();
+        },
+
+        testTagMasterInstance(test) {
+            provider.providerOptions = {
+                instanceGroup: 'foo'
+            };
+
+            const masterIid = 'bigip-bf4b';
+            const instances = {
+                'bigip-bf4b': {
+                    privateIp: '10.0.2.11'
+                },
+                'bigip-jjzs': {
+                    privateIp: '10.0.2.11'
+                },
+                'bigip-uuio': {
+                    privateIp: '10.0.2.12'
+                }
+            };
+
+            test.expect(4);
+            provider.tagMasterInstance(masterIid, instances)
+                .then(() => {
+                    test.strictEqual(vmSetTagsParams['bigip-uuio'], undefined);
+                    test.strictEqual(vmSetTagsParams['bigip-jjzs'].tags.includes('foo-master'), false);
+                    test.strictEqual(vmSetTagsParams[masterIid].tags.includes('foo-master'), true);
+                    test.strictEqual(vmSetTagsParams[masterIid].fingerprint, 'fingerprint');
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
     },
 
     testMasterElected(test) {
