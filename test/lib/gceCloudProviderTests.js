@@ -55,8 +55,8 @@ const instance1 = {
     isMaster: false
 };
 
-let AutoscaleProvider;
-let GceAutoscaleProvider;
+let CloudProvider;
+let GceCloudProvider;
 let provider;
 
 let cloudUtilMock;
@@ -73,11 +73,11 @@ module.exports = {
         cloudUtilMock = require('@f5devcentral/f5-cloud-libs').util;
         computeMock = require('@google-cloud/compute');
 
-        AutoscaleProvider = require('@f5devcentral/f5-cloud-libs').autoscaleProvider;
-        GceAutoscaleProvider = require('../../lib/gceAutoscaleProvider');
+        CloudProvider = require('@f5devcentral/f5-cloud-libs').cloudProvider;
+        GceCloudProvider = require('../../lib/gceCloudProvider');
         /* eslint-enable global-require */
 
-        provider = new GceAutoscaleProvider();
+        provider = new GceCloudProvider();
         provider.compute = {};
 
         cloudUtilMock.getDataFromUrl = function getDataFromUrl(url) {
@@ -448,7 +448,7 @@ module.exports = {
         };
 
         test.expect(2);
-        provider.getMessages([AutoscaleProvider.MESSAGE_SYNC_COMPLETE], { toInstanceId: '1' })
+        provider.getMessages([CloudProvider.MESSAGE_SYNC_COMPLETE], { toInstanceId: '1' })
             .then((response) => {
                 test.strictEqual(response.length, 1);
                 test.strictEqual(response[0].message, message1);

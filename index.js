@@ -16,5 +16,5 @@
 'use strict';
 
 module.exports = {
-    provider: require("./lib/gceAutoscaleProvider.js")
+    provider: require("./lib/gceCloudProvider.js")
 };
