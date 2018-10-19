@@ -62,6 +62,10 @@ let provider;
 let cloudUtilMock;
 let computeMock;
 
+const passedParams = {
+    storage: {}
+};
+
 const vmSetTagsParams = {};
 
 // Our tests cause too many event listeners. Turn off the check.
@@ -164,6 +168,90 @@ module.exports = {
                 })
                 .catch((err) => {
                     test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        }
+    },
+
+    testGetDataFromUri: {
+        setUp(callback) {
+            provider.storage = {
+                bucket(bucketParams) {
+                    passedParams.storage.bucketParams = bucketParams;
+                    return {
+                        file(fileParams) {
+                            passedParams.storage.fileParams = fileParams;
+                            return {
+                                download() {
+                                    return q(['{"key":"value"}']);
+                                },
+                                getMetadata() {
+                                    return q([{ contentType: 'application/json' }]);
+                                }
+                            };
+                        }
+                    };
+                }
+            };
+            callback();
+        },
+
+        testBasic(test) {
+            test.expect(3);
+            provider.getDataFromUri('gs://myBucket/myFilename')
+                .then((data) => {
+                    test.strictEqual(passedParams.storage.bucketParams, 'myBucket');
+                    test.strictEqual(passedParams.storage.fileParams, 'myFilename');
+                    test.strictEqual(data.key, 'value');
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testComplexKey(test) {
+            test.expect(3);
+            provider.getDataFromUri('gs://myBucket/myFolder/myFilename')
+                .then((data) => {
+                    test.strictEqual(passedParams.storage.bucketParams, 'myBucket');
+                    test.strictEqual(passedParams.storage.fileParams, 'myFolder/myFilename');
+                    test.strictEqual(data.key, 'value');
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testInvalidUri(test) {
+            test.expect(1);
+            provider.getDataFromUri('https://console.cloud.google.com/storage/browser/bucket/key')
+                .then(() => {
+                    test.ok(false, 'Should have thrown invalid URI');
+                })
+                .catch((err) => {
+                    test.notStrictEqual(err.message.indexOf('Invalid URI'), -1);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testInvalidArn(test) {
+            test.expect(1);
+            provider.getDataFromUri('gs://myBucket/')
+                .then(() => {
+                    test.ok(false, 'Should have thrown invalid URI');
+                })
+                .catch((err) => {
+                    test.notStrictEqual(err.message.indexOf('Invalid URI'), -1);
                 })
                 .finally(() => {
                     test.done();
