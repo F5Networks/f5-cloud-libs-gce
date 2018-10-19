@@ -121,7 +121,7 @@ Promise.all([
  *
  * @param {String} entry - The name of the metadata entry. For example 'instance/zone'
  *
- * @returns {Promise} A promise which is resolved with the metadata requested.
+ * @returns {Promise} A promise which is resolved with the metadata requested
  *
  */
 function getLocalMetadata(entry) {
@@ -149,7 +149,7 @@ function getLocalMetadata(entry) {
 *
 * @param {Object} vmName - Instance Name
 *
-* @returns {Promise} A promise which will be resolved with the metadata for the instance.
+* @returns {Promise} A promise which will be resolved with the metadata for the instance
 *
 */
 function getVmMetadata(vmName) {
@@ -171,7 +171,7 @@ function getVmMetadata(vmName) {
 /**
 * Initialize, pull in required metadata, etc.
 *
-* @returns {Promise} A promise which will be resolved upon initialization completion.
+* @returns {Promise} A promise which will be resolved upon initialization completion
 *
 */
 function init() {
@@ -199,7 +199,7 @@ function init() {
 /**
 * Send HTTP Request to GCP API (Compute)
 *
-* @returns {Promise} A promise which will be resolved upon complete response.
+* @returns {Promise} A promise which will be resolved upon complete response
 *
 */
 function sendRequest(method, path, body) {
@@ -220,7 +220,7 @@ function sendRequest(method, path, body) {
 *
 * @param {Object} vmName - Instance Name
 *
-* @returns {Promise} A promise which will be resolved with the metadata for the instance.
+* @returns {Promise} A promise which will be resolved with the metadata for the instance
 *
 */
 function getVmInfo(vmName) {
@@ -246,7 +246,7 @@ function getVmInfo(vmName) {
 *
 * @param {Object} nicArr - Updated NIC properties
 *
-* @returns {Promise} A promise which will be resolved with the operation response.
+* @returns {Promise} A promise which will be resolved with the operation response
 *
 */
 function updateNic(vmId, nicId, nicArr) {
@@ -413,7 +413,7 @@ function getTargetInstances() {
 *
 * @param {Object} arr                      - Array of arguments
 *
-* @returns {Promise} A promise which will be resolved with the metadata for the instance.
+* @returns {Promise} A promise which will be resolved with the metadata for the instance
 *
 */
 function retrier(fnToTry, options, arr) {
@@ -437,9 +437,9 @@ function retrier(fnToTry, options, arr) {
 *
 * @param {Object} ips - Array of IPs, support in .ipCidrRange
 *
-* @param {Object} ipsFilter - Array of IPs to filter IPs against, support in .address
+* @param {Object} ipsFilter - Array of filter IPs, support in .address
 *
-* @returns {Promise} A promise which will be resolved with the array of matched IPs.
+* @returns {Promise} A promise which will be resolved with the array of matched IPs
 *
 */
 function matchIps(ips, ipsFilter) {
@@ -472,7 +472,7 @@ function matchIps(ips, ipsFilter) {
 /**
 * Get a list of addresses associated with any traffic group the device is active for
 *
-* @returns {Promise} A promise which will be resolved once update is complete
+* @returns {Object} An array of addresses
 *
 */
 function getTgAddresses() {
@@ -495,13 +495,13 @@ function getTgAddresses() {
     if (!myTrafficGroupsArr.length) {
         const message = `We are not active for any traffic groups: ${instanceName}`;
         logger.info(message);
-        return q();
+        return trafficGroupIpArr;
     }
 
     // There should be at least one item in virtualAddresses
     if (!virtualAddresses.length) {
-        logger.info('No virtual addresses exist, create them prior to failover.');
-        return q();
+        logger.info('No virtual addresses exist, create them prior to failover');
+        return trafficGroupIpArr;
     }
 
     virtualAddresses.forEach((virtualAddress) => {
@@ -536,6 +536,12 @@ function updateNics(vms) {
     const trafficGroupIpArr = getTgAddresses();
     const disassociateArr = [];
     const associateArr = [];
+
+    // There should be at least one item in trafficGroupIpArr
+    if (!trafficGroupIpArr.length) {
+        logger.info('updateNics: No traffic group address(es) exist, skipping');
+        return q();
+    }
 
     // Look through each VM and seperate us vs. them
     vms.forEach((vm) => {
@@ -645,6 +651,12 @@ function updateFwdRules(fwdRules, targetInstances) {
     const rules = fwdRules.items;
     const trafficGroupIpArr = getTgAddresses();
     const fwdRulesToUpdate = [];
+
+    // There should be at least one item in trafficGroupIpArr
+    if (!trafficGroupIpArr.length) {
+        logger.info('updateFwdRules: No traffic group address(es) exist, skipping');
+        return q();
+    }
 
     const getOurTargetInstance = function (tgtInstances) {
         const result = [];
