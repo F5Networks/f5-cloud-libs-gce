@@ -218,16 +218,27 @@ function sendRequest(method, path, body) {
 /**
 * Get Instance Information from VM metadata
 *
-* @param {Object} vmName - Instance Name
+* @param {Object} vmName                   - Instance Name
+*
+* @param {Object} options                  - Options for function
+* @param {Array} options.failOnStatusCodes - Optionally provide a list of status codes to fail
+*                                              on, for example 'STOPPING'
 *
 * @returns {Promise} A promise which will be resolved with the metadata for the instance
 *
 */
-function getVmInfo(vmName) {
+function getVmInfo(vmName, options) {
     const deferred = q.defer();
+    const failOnStatusCodes = options && options.failOnStatusCodes ? options.failOnStatusCodes : [];
 
     getVmMetadata(vmName)
         .then((data) => {
+            if (failOnStatusCodes.length > 0) {
+                const vmStatus = data.status;
+                if (vmStatus && vmStatus.includes(failOnStatusCodes)) {
+                    deferred.reject(new Error('vm status is in failOnStatusCodes'));
+                }
+            }
             deferred.resolve(data);
         })
         .catch((err) => {
@@ -334,19 +345,18 @@ function getVmsByTag(tag) {
 
     compute.getVMs(options)
         .then((vmsData) => {
-            const promises = [];
+            const argsMap = [];
             const computeVms = vmsData !== undefined ? vmsData : [[]];
 
             computeVms[0].forEach((vm) => {
-                promises.push(getVmInfo(vm.name));
+                // retry if vm is stopping as metadata fingerprint returned may change
+                argsMap.push([vm.name, { failOnStatusCodes: ['STOPPING'] }]);
             });
-            q.all(promises)
-                .then((data) => {
-                    deferred.resolve(data);
-                })
-                .catch((err) => {
-                    deferred.reject(err);
-                });
+            const promises = argsMap.map(retrier.bind(null, getVmInfo, {}));
+            return q.all(promises);
+        })
+        .then((data) => {
+            deferred.resolve(data);
         })
         .catch((err) => {
             deferred.reject(err);
@@ -420,9 +430,9 @@ function retrier(fnToTry, options, arr) {
     const retryIntervalMs = options && options.retryIntervalMs ? options.retryIntervalMs : 15000;
     return new Promise(
         function retryFunc(resolve, reject) {
-            util.tryUntil(this, { maxRetries: 4, retryIntervalMs }, fnToTry, arr)
-                .then(() => {
-                    resolve();
+            util.tryUntil(this, { maxRetries: 10, retryIntervalMs }, fnToTry, arr)
+                .then((data) => {
+                    resolve(data);
                 })
                 .catch((error) => {
                     logger.error('Error: ', error);
@@ -615,7 +625,7 @@ function updateNics(vms) {
     });
     // debug
     logger.silly('disassociateArr:', disassociateArr);
-    logger.silly(`associateArr: ${JSON.stringify(associateArr, null, 1)}`);
+    logger.silly('associateArr:', associateArr);
 
     const disassociatePromises = disassociateArr.map(retrier.bind(null, updateNic, {}));
     Promise.all(disassociatePromises)
