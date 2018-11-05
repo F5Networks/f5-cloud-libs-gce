@@ -108,7 +108,9 @@ module.exports = {
 
     testInit: {
         testCredentials(test) {
-            const secretBase64 = Buffer.from(JSON.stringify(credentials)).toString('base64');
+            const secretBase64 = cloudUtilMock.createBufferFrom(
+                JSON.stringify(credentials)
+            ).toString('base64');
             const providerOptions = {
                 clientId,
                 projectId,
@@ -128,7 +130,9 @@ module.exports = {
         },
 
         testCredentialsNoRegion(test) {
-            const secretBase64 = Buffer.from(JSON.stringify(credentials)).toString('base64');
+            const secretBase64 = cloudUtilMock.createBufferFrom(
+                JSON.stringify(credentials)
+            ).toString('base64');
             const providerOptions = {
                 clientId,
                 projectId,
@@ -768,8 +772,8 @@ module.exports = {
             provider.tagMasterInstance(masterIid, instances)
                 .then(() => {
                     test.strictEqual(vmSetTagsParams['bigip-uuio'], undefined);
-                    test.strictEqual(vmSetTagsParams['bigip-jjzs'].tags.includes('foo-master'), false);
-                    test.strictEqual(vmSetTagsParams[masterIid].tags.includes('foo-master'), true);
+                    test.strictEqual(vmSetTagsParams['bigip-jjzs'].tags.indexOf('foo-master'), -1);
+                    test.notStrictEqual(vmSetTagsParams[masterIid].tags.indexOf('foo-master'), -1);
                     test.strictEqual(vmSetTagsParams[masterIid].fingerprint, 'fingerprint');
                 })
                 .catch((err) => {
