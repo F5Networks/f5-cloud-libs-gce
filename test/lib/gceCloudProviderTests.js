@@ -176,6 +176,22 @@ module.exports = {
                 .finally(() => {
                     test.done();
                 });
+        },
+
+        testStorageBucketNoCredentials(test) {
+            const storageBucket = 'gcp-storage-bucket';
+            const providerOptions = { storageBucket };
+            provider.init(providerOptions)
+                .then(() => {
+                    test.strictEqual(provider.region, region);
+                    test.strictEqual(provider.storageBucket.name, storageBucket);
+                })
+                .catch((err) => {
+                    test.ok(false, err);
+                })
+                .finally(() => {
+                    test.done();
+                });
         }
     },
 
