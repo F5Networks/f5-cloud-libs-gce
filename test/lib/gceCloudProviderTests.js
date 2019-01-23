@@ -61,10 +61,17 @@ let provider;
 
 let cloudUtilMock;
 let computeMock;
+let fsMock;
+
+let createReadStream;
 
 const passedParams = {
-    storage: {}
+    storage: {},
+    storageBucket: {
+        fileDeleteParams: []
+    }
 };
+let storageBucketFileDeleteCalled = false;
 
 const vmSetTagsParams = {};
 
@@ -76,6 +83,8 @@ module.exports = {
         /* eslint-disable global-require */
         cloudUtilMock = require('@f5devcentral/f5-cloud-libs').util;
         computeMock = require('@google-cloud/compute');
+
+        fsMock = require('fs');
 
         CloudProvider = require('@f5devcentral/f5-cloud-libs').cloudProvider;
         GceCloudProvider = require('../../lib/gceCloudProvider');
@@ -95,6 +104,7 @@ module.exports = {
 
             return q();
         };
+        createReadStream = fsMock.createReadStream;
 
         callback();
     },
@@ -103,6 +113,7 @@ module.exports = {
         Object.keys(require.cache).forEach((key) => {
             delete require.cache[key];
         });
+        fsMock.createReadStream = createReadStream;
         callback();
     },
 
@@ -276,6 +287,129 @@ module.exports = {
                 .finally(() => {
                     test.done();
                 });
+        }
+    },
+
+    testUCSFunctions: {
+        setUp(cb) {
+            provider.storageBucket = {
+                file(fileName) {
+                    passedParams.storageBucket.fileParams = fileName;
+                    return {
+                        save(dataToWrite) {
+                            passedParams.storageBucket.fileSaveParams = dataToWrite;
+                            return q();
+                        },
+                        delete() {
+                            storageBucketFileDeleteCalled = true;
+                            passedParams.storageBucket.fileDeleteParams.push(fileName);
+                            return q();
+                        }
+                    };
+                },
+                getFiles(options) {
+                    passedParams.storageBucket.getFiles = options;
+                    return q(
+                        [
+                            [
+                                {
+                                    getMetadata() {
+                                        return [
+                                            {
+                                                name: 'backup/ucsAutosave_123.ucs',
+                                                updated: '2019-01-01T18:22:10.102Z'
+                                            }
+                                        ];
+                                    }
+                                },
+                                {
+                                    getMetadata() {
+                                        return [
+                                            {
+                                                name: 'backup/ucsAutosave_234.ucs',
+                                                updated: '2019-01-02T18:22:10.102Z'
+                                            }
+                                        ];
+                                    }
+                                },
+                                {
+                                    getMetadata() {
+                                        return [
+                                            {
+                                                name: 'backup/ucsAutosave_345.ucs',
+                                                updated: '2019-01-03T18:22:10.102Z'
+                                            }
+                                        ];
+                                    }
+                                },
+                                {
+                                    getMetadata() {
+                                        return [
+                                            {
+                                                name: 'backup/ucsAutosave_456.ucs',
+                                                updated: '2019-01-04T18:22:10.102Z'
+                                            }
+                                        ];
+                                    }
+                                }
+                            ],
+                        ]
+                    );
+                }
+            };
+
+            fsMock.createReadStream = () => {
+                return 'string data';
+            };
+
+            cb();
+        },
+
+        testStoreUCS(test) {
+            const ucsFileName = 'ucsAutosave_123.ucs';
+            const ucsFilePath = `/var/local/ucs/${ucsFileName}`;
+
+            test.expect(3);
+            provider.storeUcs(ucsFilePath, 7, 'ucsAutosave_')
+                .then(() => {
+                    test.strictEqual(passedParams.storageBucket.fileParams, `backup/${ucsFileName}`);
+                    test.strictEqual(passedParams.storageBucket.fileSaveParams, 'string data');
+                    test.strictEqual(storageBucketFileDeleteCalled, false);
+                })
+                .catch((err) => {
+                    test.ok(false, err.message);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        testStoreUCSDeleteOldestObjects(test) {
+            const ucsFileName = 'ucsAutosave_123.ucs';
+            const ucsFilePath = `/var/local/ucs/${ucsFileName}`;
+
+            test.expect(3);
+            provider.storeUcs(ucsFilePath, 2, 'ucsAutosave_')
+                .then(() => {
+                    test.deepEqual(passedParams.storageBucket.getFiles, { prefix: 'backup/' });
+                    test.deepEqual(
+                        passedParams.storageBucket.fileDeleteParams,
+                        ['backup/ucsAutosave_123.ucs', 'backup/ucsAutosave_234.ucs']
+                    );
+                    test.strictEqual(storageBucketFileDeleteCalled, true);
+                })
+                .catch((err) => {
+                    test.ok(false, err.message);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
+        tearDown(cb) {
+            storageBucketFileDeleteCalled = false;
+            passedParams.storageBucket.fileDeleteParams = [];
+            cb();
         }
     },
 
