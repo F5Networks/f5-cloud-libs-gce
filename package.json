@@ -21,7 +21,8 @@
     "@google-cloud/storage": "^1.7.0",
     "commander": "^2.9.0",
     "ipaddr.js": "^1.7.0",
-    "q": "^1.5.1"
+    "q": "^1.5.1",
+    "gtoken": "2.3.0"
   },
   "peerDependencies": {
     "@f5devcentral/f5-cloud-libs": "beta"
