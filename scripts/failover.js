@@ -352,7 +352,11 @@ function getVmsByTag(tag) {
                 // retry if vm is stopping as metadata fingerprint returned may change
                 argsMap.push([vm.name, { failOnStatusCodes: ['STOPPING'] }]);
             });
-            const promises = argsMap.map(retrier.bind(null, getVmInfo, {}));
+
+            const promises = [];
+            argsMap.forEach((params) => {
+                promises.push(retrier.call(this, getVmInfo, params));
+            });
             return q.all(promises);
         })
         .then((data) => {
@@ -416,30 +420,28 @@ function getTargetInstances() {
 /**
 * Retry function using tryUntil
 *
-* @param {Object} fnToTry                  - Function to try
-*
-* @param {Object} options                  - Options for function
-* @param {Integer} options.retryIntervalMs - Number of times to retry.  Default 15000 ms
-*
-* @param {Object} arr                      - Array of arguments
+* @param {Object} fnToTry - Function to try
+* @param {Array} arr      - Array of arguments
 *
 * @returns {Promise} A promise which will be resolved with the metadata for the instance
 *
 */
-function retrier(fnToTry, options, arr) {
-    const retryIntervalMs = options && options.retryIntervalMs ? options.retryIntervalMs : 15000;
-    return new Promise(
-        function retryFunc(resolve, reject) {
-            util.tryUntil(this, { maxRetries: 10, retryIntervalMs }, fnToTry, arr)
-                .then((data) => {
-                    resolve(data);
-                })
-                .catch((error) => {
-                    logger.error('Error: ', error);
-                    reject(error);
-                });
-        }
-    );
+function retrier(fnToTry, arr) {
+    return new Promise((resolve, reject) => {
+        const tryUntilOptions = {
+            maxRetries: 100,
+            retryIntervalMs: 10000,
+            continueOnError: true // GCP returns a 400 for certain retryable errors
+        };
+        util.tryUntil(this, tryUntilOptions, fnToTry, arr)
+            .then((data) => {
+                resolve(data);
+            })
+            .catch((error) => {
+                logger.error('Retrier error: ', error);
+                reject(error);
+            });
+    });
 }
 
 /**
@@ -627,11 +629,18 @@ function updateNics(vms) {
     logger.silly('disassociateArr:', disassociateArr);
     logger.silly('associateArr:', associateArr);
 
-    const disassociatePromises = disassociateArr.map(retrier.bind(null, updateNic, {}));
+    const disassociatePromises = [];
+    disassociateArr.forEach((params) => {
+        disassociatePromises.push(retrier.call(this, updateNic, params));
+    });
     Promise.all(disassociatePromises)
         .then(() => {
             logger.info('Disassociate NICs successful');
-            const associatePromises = associateArr.map(retrier.bind(null, updateNic, {}));
+
+            const associatePromises = [];
+            associateArr.forEach((params) => {
+                associatePromises.push(retrier.call(this, updateNic, params));
+            });
             return Promise.all(associatePromises);
         })
         .then(() => {
@@ -700,18 +709,19 @@ function updateFwdRules(fwdRules, targetInstances) {
         }
     });
     // debug
-    logger.silly(`fwdRulesToUpdate: ${JSON.stringify(fwdRulesToUpdate, null, 1)}`);
+    logger.silly('fwdRulesToUpdate: ', fwdRulesToUpdate);
 
-    // longer retry interval to avoid 'resource is not ready' API response, can take 30+ seconds
-    const retryIntervalMs = 60000;
-    const rulesPromises = fwdRulesToUpdate.map(retrier.bind(null, updateFwdRule, { retryIntervalMs }));
+    const rulesPromises = [];
+    fwdRulesToUpdate.forEach((params) => {
+        rulesPromises.push(retrier.call(this, updateFwdRule, params));
+    });
     Promise.all(rulesPromises)
         .then(() => {
             logger.info('Update forwarding rules successful');
             deferred.resolve();
         })
         .catch((error) => {
-            logger.error('Error: ', error);
+            logger.error('updateFwdRules error: ', error);
             deferred.reject(error);
         });
 
