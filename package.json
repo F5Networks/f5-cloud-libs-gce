@@ -1,6 +1,6 @@
 {
   "name": "@f5devcentral/f5-cloud-libs-gce",
-  "version": "2.3.4",
+  "version": "2.4.0",
   "description": "Google Cloud implementation of f5-cloud-libs cloud provider code",
   "keywords": [
     "f5",
@@ -20,9 +20,9 @@
     "@google-cloud/compute": "^0.10.0",
     "@google-cloud/storage": "^1.7.0",
     "commander": "^2.9.0",
+    "gtoken": "2.3.0",
     "ipaddr.js": "^1.7.0",
-    "q": "^1.5.1",
-    "gtoken": "2.3.0"
+    "q": "^1.5.1"
   },
   "peerDependencies": {
     "@f5devcentral/f5-cloud-libs": "beta"
@@ -31,7 +31,7 @@
     "eslint": "^4.19.1",
     "eslint-config-airbnb-base": "^12.1.0",
     "eslint-plugin-import": "^2.9.0",
-    "nodeunit": "^0.11.2"
+    "nodeunit": "^0.11.3"
   },
   "scripts": {
     "lint": "node node_modules/eslint/bin/eslint lib src scripts",

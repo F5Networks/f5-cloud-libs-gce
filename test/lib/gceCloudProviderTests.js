@@ -365,6 +365,22 @@ module.exports = {
             cb();
         },
 
+        testDeleteStoredUcs(test) {
+            storageBucketFileDeleteCalled = false;
+            test.expect(2);
+            provider.deleteStoredUcs('foo.ucs')
+                .then(() => {
+                    test.ok(storageBucketFileDeleteCalled);
+                    test.strictEqual(passedParams.storageBucket.fileDeleteParams[0], 'backup/foo.ucs');
+                })
+                .catch((err) => {
+                    test.ok(false, err.message);
+                })
+                .finally(() => {
+                    test.done();
+                });
+        },
+
         testStoreUCS(test) {
             const ucsFileName = 'ucsAutosave_123.ucs';
             const ucsFilePath = `/var/local/ucs/${ucsFileName}`;
