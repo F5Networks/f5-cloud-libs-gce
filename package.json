@@ -17,7 +17,6 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "@f5devcentral/f5-cloud-libs": "^4.10.3",
     "@google-cloud/compute": "^0.10.0",
     "@google-cloud/storage": "^1.7.0",
     "commander": "^2.9.0",
