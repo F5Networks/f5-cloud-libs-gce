@@ -52,7 +52,7 @@ const vm1 = {
 
 const instance1 = {
     id: 'vm1',
-    isMaster: false
+    isPrimary: false
 };
 
 let CloudProvider;
@@ -429,7 +429,7 @@ module.exports = {
         }
     },
 
-    testElectMaster: {
+    testElectPrimary: {
         testBasic(test) {
             const instances = {
                 1: {
@@ -445,7 +445,7 @@ module.exports = {
             };
 
             test.expect(1);
-            provider.electMaster(instances)
+            provider.electPrimary(instances)
                 .then((response) => {
                     test.strictEqual(response, '1');
                 })
@@ -472,7 +472,7 @@ module.exports = {
             };
 
             test.expect(1);
-            provider.electMaster(instances)
+            provider.electPrimary(instances)
                 .then((response) => {
                     test.strictEqual(response, '2');
                 })
@@ -499,7 +499,7 @@ module.exports = {
             };
 
             test.expect(1);
-            provider.electMaster(instances)
+            provider.electPrimary(instances)
                 .then((response) => {
                     test.strictEqual(response, '2');
                 })
@@ -527,7 +527,7 @@ module.exports = {
             };
 
             test.expect(1);
-            provider.electMaster(instances)
+            provider.electPrimary(instances)
                 .then((response) => {
                     test.strictEqual(response, '2');
                 })
@@ -609,7 +609,7 @@ module.exports = {
                 .then((response) => {
                     test.strictEqual(Object.keys(response).length, 1);
                     test.deepEqual(response.vm1.id, instance1.id);
-                    test.deepEqual(response.vm1.isMaster, instance1.isMaster);
+                    test.deepEqual(response.vm1.isPrimary, instance1.isPrimary);
                 })
                 .catch((err) => {
                     test.ok(false, err);
@@ -868,7 +868,7 @@ module.exports = {
                 });
         }
     },
-    testTagMaster: {
+    testTagPrimary: {
         setUp(callback) {
             const instances = {
                 'bigip-bf4b': {
@@ -878,7 +878,7 @@ module.exports = {
                 },
                 'bigip-jjzs': {
                     tags: [
-                        'other-tag', 'foo-master'
+                        'other-tag', 'foo-primary'
                     ]
                 },
                 'bigip-uuio': {
@@ -916,12 +916,12 @@ module.exports = {
             callback();
         },
 
-        testTagMasterInstance(test) {
+        testTagPrimaryInstance(test) {
             provider.providerOptions = {
                 instanceGroup: 'foo'
             };
 
-            const masterIid = 'bigip-bf4b';
+            const primaryIid = 'bigip-bf4b';
             const instances = {
                 'bigip-bf4b': {
                     privateIp: '10.0.2.11'
@@ -935,12 +935,12 @@ module.exports = {
             };
 
             test.expect(4);
-            provider.tagMasterInstance(masterIid, instances)
+            provider.tagPrimaryInstance(primaryIid, instances)
                 .then(() => {
                     test.strictEqual(vmSetTagsParams['bigip-uuio'], undefined);
-                    test.strictEqual(vmSetTagsParams['bigip-jjzs'].tags.indexOf('foo-master'), -1);
-                    test.notStrictEqual(vmSetTagsParams[masterIid].tags.indexOf('foo-master'), -1);
-                    test.strictEqual(vmSetTagsParams[masterIid].fingerprint, 'fingerprint');
+                    test.strictEqual(vmSetTagsParams['bigip-jjzs'].tags.indexOf('foo-primary'), -1);
+                    test.notStrictEqual(vmSetTagsParams[primaryIid].tags.indexOf('foo-primary'), -1);
+                    test.strictEqual(vmSetTagsParams[primaryIid].fingerprint, 'fingerprint');
                 })
                 .catch((err) => {
                     test.ok(false, err);
@@ -951,7 +951,7 @@ module.exports = {
         },
     },
 
-    testMasterElected(test) {
+    testPrimaryElected(test) {
         let instanceIdSent;
         let instanceSent;
 
@@ -967,7 +967,7 @@ module.exports = {
                             download() {
                                 return [
                                     JSON.stringify({
-                                        isMaster: true
+                                        isPrimary: true
                                     })
                                 ];
                             },
@@ -983,7 +983,7 @@ module.exports = {
                             download() {
                                 return [
                                     JSON.stringify({
-                                        isMaster: true
+                                        isPrimary: true
                                     })
                                 ];
                             },
@@ -1020,10 +1020,10 @@ module.exports = {
             instanceSent = instance;
         };
 
-        provider.masterElected('vm1')
+        provider.primaryElected('vm1')
             .then(() => {
                 test.strictEqual(instanceIdSent, 'vm2');
-                test.strictEqual(instanceSent.isMaster, false);
+                test.strictEqual(instanceSent.isPrimary, false);
             })
             .catch((err) => {
                 test.ok(false, err);
