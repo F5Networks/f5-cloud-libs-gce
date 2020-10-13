@@ -19,7 +19,7 @@
   "dependencies": {
     "@f5devcentral/f5-cloud-libs": "^4.22.0-beta.1",
     "@google-cloud/compute": "^2.2.0",
-    "@google-cloud/storage": "^5.3.0",
+    "@google-cloud/storage": "^1.7.0",
     "commander": "^2.9.0",
     "gtoken": "^5.0.4",
     "ipaddr.js": "^1.7.0",
