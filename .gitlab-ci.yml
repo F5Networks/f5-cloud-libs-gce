@@ -50,6 +50,17 @@ test_node8:
         - npm run lint
         - npm test
 
+
+# audit packages for vulnerabilities
+test_audit:
+    stage: test
+    script:
+        # npm audit - uses custom audit processor wrapper
+        - npm install
+        - npm run audit
+    tags:
+        - cm-official-docker-executor
+
 package:
     tags:
         - docker-executor
