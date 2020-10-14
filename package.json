@@ -17,7 +17,6 @@
   },
   "auditProcessor": {
     "whitelist": [
-      "1561"
     ]
   },
   "license": "Apache-2.0",
