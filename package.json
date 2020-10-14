@@ -15,6 +15,11 @@
   "bugs": {
     "url": "https://github.com/F5Networks/f5-cloud-libs-gce/issues"
   },
+  "auditProcessor": {
+    "whitelist": [
+      "1561"
+    ]
+  },
   "license": "Apache-2.0",
   "dependencies": {
     "@f5devcentral/f5-cloud-libs": "^4.22.0-beta.1",
@@ -36,6 +41,7 @@
     "mocha": "^7.1.1"
   },
   "scripts": {
+    "audit": "npm audit --json > .auditReport.json; node scripts/auditProcessor.js",
     "lint": "node node_modules/eslint/bin/eslint lib src scripts",
     "package": "bash ./package.sh",
     "test": "mocha --exit test/lib",
