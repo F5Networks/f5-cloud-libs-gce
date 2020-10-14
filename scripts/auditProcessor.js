@@ -21,11 +21,12 @@
  * Usage: node auditProcessor.js --help
  */
 
+
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
-const yargs = require('yargs'); // eslint-disable-line import/no-extraneous-dependencies
+const yargs = require('yargs'); // eslint-disable-line import/no-extraneous-dependencies import/no-unresolved
 
 const PACKAGE_JSON = path.join(process.cwd(), 'package.json');
 const AUDIT_REPORT = path.join(process.cwd(), '.auditReport.json');
