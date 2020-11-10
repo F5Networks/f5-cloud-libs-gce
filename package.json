@@ -1,6 +1,6 @@
 {
   "name": "@f5devcentral/f5-cloud-libs-gce",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "Google Cloud implementation of f5-cloud-libs cloud provider code",
   "keywords": [
     "f5",
@@ -16,8 +16,7 @@
     "url": "https://github.com/F5Networks/f5-cloud-libs-gce/issues"
   },
   "auditProcessor": {
-    "whitelist": [
-    ]
+    "whitelist": []
   },
   "license": "Apache-2.0",
   "dependencies": {
