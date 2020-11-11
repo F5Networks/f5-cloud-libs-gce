@@ -17,69 +17,70 @@
 'use strict';
 
 const q = require('q');
+const assert = require('assert');
 
-const region = 'aRegion';
-const clientId = 'aClient';
-const projectId = 'aProject';
-const credentials = {
-    foo: 'bar'
-};
+describe('failover tests', () => {
+    const region = 'aRegion';
+    const clientId = 'aClient';
+    const projectId = 'aProject';
+    const credentials = {
+        foo: 'bar'
+    };
 
-const instanceId = 'this_is_my_instance_id';
+    const instanceId = 'this_is_my_instance_id';
 
-const vm1 = {
-    name: 'vm1',
-    metadata: {
-        status: 'RUNNING',
-    },
-    getMetadata() {
-        return q(
-            [{
-                networkInterfaces: [
-                    {
-                        networkIP: '1.2.3.4',
-                        accessConfigs: [
-                            {
-                                natIP: '5.6.7.8'
-                            }
-                        ]
-                    }
-                ]
-            }]
-        );
-    }
-};
+    const vm1 = {
+        name: 'vm1',
+        metadata: {
+            status: 'RUNNING',
+        },
+        getMetadata() {
+            return q(
+                [{
+                    networkInterfaces: [
+                        {
+                            networkIP: '1.2.3.4',
+                            accessConfigs: [
+                                {
+                                    natIP: '5.6.7.8'
+                                }
+                            ]
+                        }
+                    ]
+                }]
+            );
+        }
+    };
 
-const instance1 = {
-    id: 'vm1',
-    isPrimary: false
-};
+    const instance1 = {
+        id: 'vm1',
+        isPrimary: false
+    };
 
-let CloudProvider;
-let GceCloudProvider;
-let provider;
+    let CloudProvider;
+    let GceCloudProvider;
+    let provider;
 
-let cloudUtilMock;
-let computeMock;
-let fsMock;
+    let cloudUtilMock;
+    let computeMock;
+    let fsMock;
 
-let createReadStream;
+    let createReadStream;
 
-const passedParams = {
-    storage: {},
-    storageBucket: {
-        fileDeleteParams: []
-    }
-};
-let storageBucketFileDeleteCalled = false;
+    const passedParams = {
+        storage: {},
+        storageBucket: {
+            fileDeleteParams: []
+        }
+    };
+    let storageBucketFileDeleteCalled = false;
 
-const vmSetTagsParams = {};
+    const vmSetTagsParams = {};
 
-// Our tests cause too many event listeners. Turn off the check.
-process.setMaxListeners(0);
+    // Our tests cause too many event listeners. Turn off the check.
+    process.setMaxListeners(0);
 
-module.exports = {
-    setUp(callback) {
+    beforeEach(() => {
         /* eslint-disable global-require */
         cloudUtilMock = require('@f5devcentral/f5-cloud-libs').util;
         computeMock = require('@google-cloud/compute');
@@ -105,20 +106,17 @@ module.exports = {
             return q();
         };
         createReadStream = fsMock.createReadStream;
+    });
 
-        callback();
-    },
-
-    tearDown(callback) {
+    afterEach(() => {
         Object.keys(require.cache).forEach((key) => {
             delete require.cache[key];
         });
         fsMock.createReadStream = createReadStream;
-        callback();
-    },
+    });
 
-    testInit: {
-        testCredentials(test) {
+    describe('init tests', () => {
+        it('credentials test', (done) => {
             const secretBase64 = cloudUtilMock.createBufferFrom(
                 JSON.stringify(credentials)
             ).toString('base64');
@@ -130,17 +128,17 @@ module.exports = {
             };
             provider.init(providerOptions)
                 .then(() => {
-                    test.deepEqual(provider.compute.authClient.config.credentials, credentials);
+                    assert.deepEqual(provider.compute.authClient.config.credentials, credentials);
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testCredentialsNoRegion(test) {
+        it('credentials no region test', (done) => {
             const secretBase64 = cloudUtilMock.createBufferFrom(
                 JSON.stringify(credentials)
             ).toString('base64');
@@ -151,63 +149,63 @@ module.exports = {
             };
             provider.init(providerOptions)
                 .then(() => {
-                    test.ok(false, 'Should have thrown no region');
+                    assert.ok(false, 'Should have thrown no region');
                 })
                 .catch((err) => {
-                    test.notStrictEqual(err.message.indexOf('region is required'), -1);
+                    assert.notStrictEqual(err.message.indexOf('region is required'), -1);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testNoCredentials(test) {
+        it('no credentials test', (done) => {
             const providerOptions = { region };
             provider.init(providerOptions)
                 .then(() => {
-                    test.strictEqual(provider.region, region);
+                    assert.strictEqual(provider.region, region);
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testNoCredentialsNoRegion(test) {
+        it('no credentials no region test', (done) => {
             const providerOptions = {};
             provider.init(providerOptions)
                 .then(() => {
-                    test.strictEqual(provider.region, region);
+                    assert.strictEqual(provider.region, region);
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testStorageBucketNoCredentials(test) {
+        it('storage bucket no credentials test', (done) => {
             const storageBucket = 'gcp-storage-bucket';
             const providerOptions = { storageBucket };
             provider.init(providerOptions)
                 .then(() => {
-                    test.strictEqual(provider.region, region);
-                    test.strictEqual(provider.storageBucket.name, storageBucket);
+                    assert.strictEqual(provider.region, region);
+                    assert.strictEqual(provider.storageBucket.name, storageBucket);
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        }
-    },
+        });
+    });
 
-    testGetDataFromUri: {
-        setUp(callback) {
+    describe('get data from uri tests', () => {
+        beforeEach(() => {
             provider.storage = {
                 bucket(bucketParams) {
                     passedParams.storage.bucketParams = bucketParams;
@@ -226,72 +224,67 @@ module.exports = {
                     };
                 }
             };
-            callback();
-        },
+        });
 
-        testBasic(test) {
-            test.expect(3);
+        it('basic test', (done) => {
             provider.getDataFromUri('gs://myBucket/myFilename')
                 .then((data) => {
-                    test.strictEqual(passedParams.storage.bucketParams, 'myBucket');
-                    test.strictEqual(passedParams.storage.fileParams, 'myFilename');
-                    test.strictEqual(data.key, 'value');
+                    assert.strictEqual(passedParams.storage.bucketParams, 'myBucket');
+                    assert.strictEqual(passedParams.storage.fileParams, 'myFilename');
+                    assert.strictEqual(data.key, 'value');
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testComplexKey(test) {
-            test.expect(3);
+        it('complex key test', (done) => {
             provider.getDataFromUri('gs://myBucket/myFolder/myFilename')
                 .then((data) => {
-                    test.strictEqual(passedParams.storage.bucketParams, 'myBucket');
-                    test.strictEqual(passedParams.storage.fileParams, 'myFolder/myFilename');
-                    test.strictEqual(data.key, 'value');
+                    assert.strictEqual(passedParams.storage.bucketParams, 'myBucket');
+                    assert.strictEqual(passedParams.storage.fileParams, 'myFolder/myFilename');
+                    assert.strictEqual(data.key, 'value');
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testInvalidUri(test) {
-            test.expect(1);
+        it('invalid uri test', (done) => {
             provider.getDataFromUri('https://console.cloud.google.com/storage/browser/bucket/key')
                 .then(() => {
-                    test.ok(false, 'Should have thrown invalid URI');
+                    assert.ok(false, 'Should have thrown invalid URI');
                 })
                 .catch((err) => {
-                    test.notStrictEqual(err.message.indexOf('Invalid URI'), -1);
+                    assert.notStrictEqual(err.message.indexOf('Invalid URI'), -1);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testInvalidArn(test) {
-            test.expect(1);
+        it('invalid arn test', (done) => {
             provider.getDataFromUri('gs://myBucket/')
                 .then(() => {
-                    test.ok(false, 'Should have thrown invalid URI');
+                    assert.ok(false, 'Should have thrown invalid URI');
                 })
                 .catch((err) => {
-                    test.notStrictEqual(err.message.indexOf('Invalid URI'), -1);
+                    assert.notStrictEqual(err.message.indexOf('Invalid URI'), -1);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        }
-    },
+        });
+    });
 
-    testUCSFunctions: {
-        setUp(cb) {
+    describe('ucs functions tests', () => {
+        beforeEach(() => {
             provider.storageBucket = {
                 file(fileName) {
                     passedParams.storageBucket.fileParams = fileName;
@@ -361,76 +354,70 @@ module.exports = {
             fsMock.createReadStream = () => {
                 return 'string data';
             };
+        });
 
-            cb();
-        },
-
-        testDeleteStoredUcs(test) {
+        afterEach(() => {
             storageBucketFileDeleteCalled = false;
-            test.expect(2);
+            passedParams.storageBucket.fileDeleteParams = [];
+        });
+
+        it('delete stored ucs test', (done) => {
+            storageBucketFileDeleteCalled = false;
             provider.deleteStoredUcs('foo.ucs')
                 .then(() => {
-                    test.ok(storageBucketFileDeleteCalled);
-                    test.strictEqual(passedParams.storageBucket.fileDeleteParams[0], 'backup/foo.ucs');
+                    assert.ok(storageBucketFileDeleteCalled);
+                    assert.strictEqual(passedParams.storageBucket.fileDeleteParams[0], 'backup/foo.ucs');
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testStoreUCS(test) {
+        it('store ucs test', (done) => {
             const ucsFileName = 'ucsAutosave_123.ucs';
             const ucsFilePath = `/var/local/ucs/${ucsFileName}`;
 
-            test.expect(3);
             provider.storeUcs(ucsFilePath, 7, 'ucsAutosave_')
                 .then(() => {
-                    test.strictEqual(passedParams.storageBucket.fileParams, `backup/${ucsFileName}`);
-                    test.strictEqual(passedParams.storageBucket.fileSaveParams, 'string data');
-                    test.strictEqual(storageBucketFileDeleteCalled, false);
+                    assert.strictEqual(passedParams.storageBucket.fileParams, `backup/${ucsFileName}`);
+                    assert.strictEqual(passedParams.storageBucket.fileSaveParams, 'string data');
+                    assert.strictEqual(storageBucketFileDeleteCalled, false);
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testStoreUCSDeleteOldestObjects(test) {
+        it('store ucs delete oldest objects test', (done) => {
             const ucsFileName = 'ucsAutosave_123.ucs';
             const ucsFilePath = `/var/local/ucs/${ucsFileName}`;
 
-            test.expect(3);
             provider.storeUcs(ucsFilePath, 2, 'ucsAutosave_')
                 .then(() => {
-                    test.deepEqual(passedParams.storageBucket.getFiles, { prefix: 'backup/' });
-                    test.deepEqual(
+                    assert.deepEqual(passedParams.storageBucket.getFiles, { prefix: 'backup/' });
+                    assert.deepEqual(
                         passedParams.storageBucket.fileDeleteParams,
                         ['backup/ucsAutosave_123.ucs', 'backup/ucsAutosave_234.ucs']
                     );
-                    test.strictEqual(storageBucketFileDeleteCalled, true);
+                    assert.strictEqual(storageBucketFileDeleteCalled, true);
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
+    });
 
-        tearDown(cb) {
-            storageBucketFileDeleteCalled = false;
-            passedParams.storageBucket.fileDeleteParams = [];
-            cb();
-        }
-    },
-
-    testElectPrimary: {
-        testBasic(test) {
+    describe('elect primary tests', () => {
+        it('basic test', (done) => {
             const instances = {
                 1: {
                     privateIp: '1.2.3.4',
@@ -444,20 +431,19 @@ module.exports = {
                 }
             };
 
-            test.expect(1);
             provider.electPrimary(instances)
                 .then((response) => {
-                    test.strictEqual(response, '1');
+                    assert.strictEqual(response, '1');
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testProviderNotVisible(test) {
+        it('provider not visible test', (done) => {
             const instances = {
                 1: {
                     privateIp: '1.2.3.4',
@@ -471,20 +457,19 @@ module.exports = {
                 }
             };
 
-            test.expect(1);
             provider.electPrimary(instances)
                 .then((response) => {
-                    test.strictEqual(response, '2');
+                    assert.strictEqual(response, '2');
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testVersionNotOk(test) {
+        it('version not ok test', (done) => {
             const instances = {
                 1: {
                     privateIp: '1.2.3.4',
@@ -498,20 +483,19 @@ module.exports = {
                 }
             };
 
-            test.expect(1);
             provider.electPrimary(instances)
                 .then((response) => {
-                    test.strictEqual(response, '2');
+                    assert.strictEqual(response, '2');
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testExternal(test) {
+        it('external test', (done) => {
             const instances = {
                 1: {
                     privateIp: '1.2.3.4',
@@ -526,36 +510,34 @@ module.exports = {
                 }
             };
 
-            test.expect(1);
             provider.electPrimary(instances)
                 .then((response) => {
-                    test.strictEqual(response, '2');
+                    assert.strictEqual(response, '2');
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        }
-    },
+        });
+    });
 
-    testGetInstanceId(test) {
-        test.expect(1);
+    it('get instance id test', (done) => {
         provider.getInstanceId()
             .then((response) => {
-                test.strictEqual(response, instanceId);
+                assert.strictEqual(response, instanceId);
             })
             .catch((err) => {
-                test.ok(false, err.message);
+                assert.ok(false, err.message);
             })
             .finally(() => {
-                test.done();
+                done();
             });
-    },
+    });
 
-    testGetInstances: {
-        setUp(cb) {
+    describe('get instances tests', () => {
+        beforeEach(() => {
             computeMock.zone = function zone() {
                 return {
                     instanceGroup() {
@@ -600,26 +582,24 @@ module.exports = {
             };
 
             provider.compute = computeMock;
-            cb();
-        },
+        });
 
-        testBasic(test) {
-            test.expect(3);
+        it('basic test', (done) => {
             provider.getInstances()
                 .then((response) => {
-                    test.strictEqual(Object.keys(response).length, 1);
-                    test.deepEqual(response.vm1.id, instance1.id);
-                    test.deepEqual(response.vm1.isPrimary, instance1.isPrimary);
+                    assert.strictEqual(Object.keys(response).length, 1);
+                    assert.deepEqual(response.vm1.id, instance1.id);
+                    assert.deepEqual(response.vm1.isPrimary, instance1.isPrimary);
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testExternalInstances(test) {
+        it('external instances test', (done) => {
             computeMock.zone = function zone() {
                 return {
                     instanceGroup() {
@@ -648,43 +628,41 @@ module.exports = {
                 ]);
             };
 
-            test.expect(2);
             provider.getInstances({ externalTag: 'foo' })
                 .then((response) => {
-                    test.strictEqual(Object.keys(response).length, 2);
-                    test.deepEqual(response.vm2.external, true);
+                    assert.strictEqual(Object.keys(response).length, 2);
+                    assert.deepEqual(response.vm2.external, true);
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testMissingInstances(test) {
+        it('missing instances test', (done) => {
             provider.storageBucket = {
                 getFiles() {
                     return q([[]]);
                 }
             };
 
-            test.expect(2);
             provider.getInstances()
                 .then((response) => {
-                    test.strictEqual(Object.keys(response).length, 1);
-                    test.deepEqual(response.vm1.privateIp, '1.2.3.4');
+                    assert.strictEqual(Object.keys(response).length, 1);
+                    assert.deepEqual(response.vm1.privateIp, '1.2.3.4');
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        }
-    },
+        });
+    });
 
-    testGetMessages(test) {
+    it('get messages test', (done) => {
         const message1 = 'i am message 1';
         const message2 = 'i am message 2';
 
@@ -705,38 +683,36 @@ module.exports = {
             }
         };
 
-        test.expect(2);
         provider.getMessages([CloudProvider.MESSAGE_SYNC_COMPLETE], { toInstanceId: '1' })
             .then((response) => {
-                test.strictEqual(response.length, 1);
-                test.strictEqual(response[0].message, message1);
+                assert.strictEqual(response.length, 1);
+                assert.strictEqual(response[0].message, message1);
             })
             .catch((err) => {
-                test.ok(false, err);
+                assert.ok(false, err);
             })
             .finally(() => {
-                test.done();
+                done();
             });
-    },
+    });
 
-    testGetNicsByTag: {
-        testBasic(test) {
-            test.expect(1);
+    describe('get nics by tag tests', () => {
+        it('basic test', (done) => {
             provider.getNicsByTag('foo')
                 .then((response) => {
-                    test.strictEqual(response.length, 0);
+                    assert.strictEqual(response.length, 0);
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        }
-    },
+        });
+    });
 
-    testGetVmsByTag: {
-        testBasic(test) {
+    describe('get vms by tag tests', () => {
+        it('basic test', (done) => {
             const myTag = {
                 key: 'foo',
                 value: 'bar'
@@ -779,11 +755,10 @@ module.exports = {
                 });
             };
 
-            test.expect(2);
             provider.getVmsByTag(myTag)
                 .then((response) => {
-                    test.deepEqual(passedOptions, { filter: `labels.${myTag.key} eq ${myTag.value}` });
-                    test.deepEqual(
+                    assert.deepEqual(passedOptions, { filter: `labels.${myTag.key} eq ${myTag.value}` });
+                    assert.deepEqual(
                         response[0],
                         {
                             id: vmId,
@@ -795,14 +770,14 @@ module.exports = {
                     );
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testNoResults(test) {
+        it('no results test', (done) => {
             const myTag = {
                 key: 'foo',
                 value: 'bar'
@@ -814,36 +789,34 @@ module.exports = {
                 });
             };
 
-            test.expect();
             provider.getVmsByTag(myTag)
                 .then((response) => {
-                    test.strictEqual(response.length, 0);
+                    assert.strictEqual(response.length, 0);
                 })
                 .catch((err) => {
-                    test.ok(false, err.message);
+                    assert.ok(false, err.message);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testBadTag(test) {
+        it('bad tag test', (done) => {
             const myTag = 'foo';
 
-            test.expect(1);
             provider.getVmsByTag(myTag)
                 .then(() => {
-                    test.ok(false, 'getVmsByTag should have thrown');
+                    assert.ok(false, 'getVmsByTag should have thrown');
                 })
                 .catch((err) => {
-                    test.notStrictEqual(err.message.indexOf('key and value'), -1);
+                    assert.notStrictEqual(err.message.indexOf('key and value'), -1);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
+        });
 
-        testError(test) {
+        it('error test', (done) => {
             const myTag = {
                 key: 'foo',
                 value: 'bar'
@@ -855,21 +828,21 @@ module.exports = {
                 });
             };
 
-            test.expect(1);
             provider.getVmsByTag(myTag)
                 .then(() => {
-                    test.ok(false, 'getVmsByTag should have thrown');
+                    assert.ok(false, 'getVmsByTag should have thrown');
                 })
                 .catch((err) => {
-                    test.strictEqual(err.message, 'uh oh');
+                    assert.strictEqual(err.message, 'uh oh');
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        }
-    },
-    testTagPrimary: {
-        setUp(callback) {
+        });
+    });
+
+    describe('tag primary tests', () => {
+        beforeEach(() => {
             const instances = {
                 'bigip-bf4b': {
                     tags: [
@@ -913,10 +886,9 @@ module.exports = {
             };
 
             provider.compute = computeMock;
-            callback();
-        },
+        });
 
-        testTagPrimaryInstance(test) {
+        it('tag primary instance test', (done) => {
             provider.providerOptions = {
                 instanceGroup: 'foo'
             };
@@ -934,24 +906,23 @@ module.exports = {
                 }
             };
 
-            test.expect(4);
             provider.tagPrimaryInstance(primaryIid, instances)
                 .then(() => {
-                    test.strictEqual(vmSetTagsParams['bigip-uuio'], undefined);
-                    test.strictEqual(vmSetTagsParams['bigip-jjzs'].tags.indexOf('foo-primary'), -1);
-                    test.notStrictEqual(vmSetTagsParams[primaryIid].tags.indexOf('foo-primary'), -1);
-                    test.strictEqual(vmSetTagsParams[primaryIid].fingerprint, 'fingerprint');
+                    assert.strictEqual(vmSetTagsParams['bigip-uuio'], undefined);
+                    assert.strictEqual(vmSetTagsParams['bigip-jjzs'].tags.indexOf('foo-primary'), -1);
+                    assert.notStrictEqual(vmSetTagsParams[primaryIid].tags.indexOf('foo-primary'), -1);
+                    assert.strictEqual(vmSetTagsParams[primaryIid].fingerprint, 'fingerprint');
                 })
                 .catch((err) => {
-                    test.ok(false, err);
+                    assert.ok(false, err);
                 })
                 .finally(() => {
-                    test.done();
+                    done();
                 });
-        },
-    },
+        });
+    });
 
-    testPrimaryElected(test) {
+    it('primary elected test', (done) => {
         let instanceIdSent;
         let instanceSent;
 
@@ -1022,14 +993,14 @@ module.exports = {
 
         provider.primaryElected('vm1')
             .then(() => {
-                test.strictEqual(instanceIdSent, 'vm2');
-                test.strictEqual(instanceSent.isPrimary, false);
+                assert.strictEqual(instanceIdSent, 'vm2');
+                assert.strictEqual(instanceSent.isPrimary, false);
             })
             .catch((err) => {
-                test.ok(false, err);
+                assert.ok(false, err);
             })
             .finally(() => {
-                test.done();
+                done();
             });
-    }
-};
+    });
+});
