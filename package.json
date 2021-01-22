@@ -1,6 +1,6 @@
 {
   "name": "@f5devcentral/f5-cloud-libs-gce",
-  "version": "2.7.0",
+  "version": "2.7.2",
   "description": "Google Cloud implementation of f5-cloud-libs cloud provider code",
   "keywords": [
     "f5",
@@ -20,7 +20,6 @@
   },
   "license": "Apache-2.0",
   "dependencies": {
-    "@f5devcentral/f5-cloud-libs": "^4.22.0-beta.1",
     "@google-cloud/compute": "^0.10.0",
     "@google-cloud/storage": "^1.7.0",
     "commander": "^2.9.0",
