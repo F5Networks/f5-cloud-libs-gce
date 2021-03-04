@@ -15,8 +15,8 @@ test_node4:
         - triggers
     script:
         - npm install --global npm@5.10.0
-        - npm ci --registry ${NPM_REGISTRY}
         - npm install --registry ${NPM_REGISTRY} @f5devcentral/f5-cloud-libs@beta
+        - npm install --registry ${NPM_REGISTRY}
         - npm install mocha@5.2.0
         - npm install nyc@11.1.0
         - npm run lint
@@ -56,7 +56,7 @@ test_audit:
     stage: test
     script:
         # npm audit - uses custom audit processor wrapper
-        - npm ci
+        - npm install
         - npm run audit
     tags:
         - cm-official-docker-executor
