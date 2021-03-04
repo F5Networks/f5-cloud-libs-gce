@@ -1,3 +1,5 @@
+env:
+    mocha: true
 extends: airbnb-base
 parserOptions:
     ecmaVersion: 6
