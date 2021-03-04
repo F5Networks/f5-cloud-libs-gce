@@ -30,8 +30,8 @@ test_node6:
     except:
         - triggers
     script:
-        - npm install --registry ${NPM_REGISTRY} --no-save @f5devcentral/f5-cloud-libs@beta
         - npm install --registry ${NPM_REGISTRY}
+        - npm install --registry ${NPM_REGISTRY} --no-save @f5devcentral/f5-cloud-libs@beta
         - npm install mocha@5.2.0
         - npm install nyc@14.0.0
         - npm run lint
@@ -45,8 +45,8 @@ test_node8:
     except:
         - triggers
     script:
+        - npm ci --registry ${NPM_REGISTRY}
         - npm install --registry ${NPM_REGISTRY} --no-save @f5devcentral/f5-cloud-libs@beta
-        - npm install --registry ${NPM_REGISTRY}
         - npm run lint
         - npm test
 
