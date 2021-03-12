@@ -237,6 +237,37 @@ describe('failover tests', () => {
         });
     });
 
+    describe('deleteStoredObject tests', () => {
+        beforeEach(() => {
+            provider.storageBucket = {
+                file(fileName) {
+                    passedParams.storageBucket.fileParams = fileName;
+                    return {
+                        delete() {
+                            storageBucketFileDeleteCalled = true;
+                            passedParams.storageBucket.fileDeleteParams.push(fileName);
+                            return q();
+                        }
+                    };
+                }
+            };
+        });
+
+        afterEach(() => {
+            storageBucketFileDeleteCalled = false;
+            passedParams.storageBucket.fileDeleteParams = [];
+        });
+
+        it('delete stored object test', () => {
+            storageBucketFileDeleteCalled = false;
+            return provider.deleteStoredObject('credentials/primary')
+                .then(() => {
+                    assert.ok(storageBucketFileDeleteCalled);
+                    assert.strictEqual(passedParams.storageBucket.fileDeleteParams[0], 'credentials/primary');
+                });
+        });
+    });
+
     describe('ucs functions tests', () => {
         beforeEach(() => {
             provider.storageBucket = {
