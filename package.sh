@@ -1,8 +1,8 @@
 #!/bin/bash
 if [[ $1 == '--production' ]]; then
-    npx npm-force-resolutions
     npm install --production
     rm -rf node_modules/@f5devcentral
+    npm ls lodash
 fi
 
 tar -C .. --exclude=".git*" --exclude="${PWD##*/}/test" --exclude="${PWD##*/}/dist" --exclude="${PWD##*/}/build" --exclude="${PWD##*/}/doc" --exclude="${PWD##*/}/gitHooks" -cf dist/f5-cloud-libs-gce.tar f5-cloud-libs-gce
