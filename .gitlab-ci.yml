@@ -63,7 +63,6 @@ test_audit:
         - triggers
 
 package:
-    image: $DOCKER_URL/node:8
     tags:
         - docker-executor
     stage: package
