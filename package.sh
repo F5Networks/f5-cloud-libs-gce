@@ -1,5 +1,6 @@
 #!/bin/bash
 if [[ $1 == '--production' ]]; then
+    npx npm-force-resolutions
     npm install --production
     rm -rf node_modules/@f5devcentral
 fi
