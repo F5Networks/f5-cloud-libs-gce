@@ -16,12 +16,24 @@
     "url": "https://github.com/F5Networks/f5-cloud-libs-gce/issues"
   },
   "auditProcessor": {
-    "whitelist": []
+    "whitelist": [
+      "1064611",
+      "1064657",
+      "1064664",
+      "1064676",
+      "1064677",
+      "1064678",
+      "1064917",
+      "1065159",
+      "1065494",
+      "1065554"
+    ]
   },
   "license": "Apache-2.0",
   "resolutions": {
     "lodash": "4.17.21",
-    "node-forge": "0.10.0"
+    "node-forge": "0.10.0",
+    "path-parse": "1.0.7"
   },
   "dependencies": {
     "@google-cloud/compute": "^0.10.0",
