@@ -1,6 +1,6 @@
 {
   "name": "@f5devcentral/f5-cloud-libs-gce",
-  "version": "2.9.1",
+  "version": "2.9.2",
   "description": "Google Cloud implementation of f5-cloud-libs cloud provider code",
   "keywords": [
     "f5",
@@ -16,12 +16,24 @@
     "url": "https://github.com/F5Networks/f5-cloud-libs-gce/issues"
   },
   "auditProcessor": {
-    "whitelist": []
+    "whitelist": [
+      "1064611",
+      "1064657",
+      "1064664",
+      "1064676",
+      "1064677",
+      "1064678",
+      "1064917",
+      "1065159",
+      "1065494",
+      "1065554"
+    ]
   },
   "license": "Apache-2.0",
   "resolutions": {
     "lodash": "4.17.21",
-    "node-forge": "0.10.0"
+    "node-forge": "0.10.0",
+    "path-parse": "1.0.7"
   },
   "dependencies": {
     "@google-cloud/compute": "^0.10.0",
@@ -45,7 +57,7 @@
     "audit": "npm audit --json > .auditReport.json; node scripts/auditProcessor.js",
     "lint": "node node_modules/eslint/bin/eslint lib src scripts",
     "package": "bash ./package.sh",
-    "preinstall": "npx npm-force-resolutions",
+    "preinstall": "if [ -f ./package-lock.json ]; then npx npm-force-resolutions; fi",
     "test": "mocha --exit test/lib",
     "version": "./setVersion.sh $npm_package_version && git add ."
   }
