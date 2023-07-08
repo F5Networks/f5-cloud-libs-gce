@@ -36,8 +36,8 @@
     "path-parse": "1.0.7"
   },
   "dependencies": {
-    "@google-cloud/compute": "^0.10.0",
-    "@google-cloud/storage": "^1.7.0",
+    "@google-cloud/compute": "^3.9.1",
+    "@google-cloud/storage": "^6.11.0",
     "commander": "^2.9.0",
     "gtoken": "2.3.0",
     "ipaddr.js": "^1.7.0",
